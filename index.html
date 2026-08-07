@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orbitfolio</title>
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.1/build/three.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="logo">Orbitfolio</div>
+    <nav class="nav-links">
+      <a href="#" data-page="home">Início</a>
+      <a href="#" data-page="ranking">Ranking</a>
+      <a href="#" data-page="commits">Commits</a>
+      <a href="#" data-page="social">Social</a>
+    </nav>
+    <div class="search-box">
+      <input type="text" placeholder="Buscar..." />
+    </div>
+    <div class="profile-button" data-page="social">DS</div>
+  </header>
+
+  <section id="page-home" class="page active">
+    <canvas id="app"></canvas>
+
+    <div id="interaction-indicator" class="interaction-indicator hidden">
+      Clique para explorar
+    </div>
+
+    <div id="controls-hint" class="controls-hint">
+      W acelerar &nbsp; S frear &nbsp; A esquerda &nbsp; D direita &nbsp; Espaço subir &nbsp; Shift descer
+    </div>
+  </section>
+
+  <section id="page-ranking" class="page">
+    <h2 class="page-title">Ranking de Projetos</h2>
+    <div id="ranking-grid" class="ranking-grid"></div>
+  </section>
+
+  <section id="page-commits" class="page">
+    <div class="commits-header">
+      <h2 class="page-title">Histórico de Commits</h2>
+      <select id="commits-project-select"></select>
+    </div>
+    <div id="commits-timeline" class="commits-timeline"></div>
+  </section>
+
+  <section id="page-social" class="page">
+    <div class="social-header">
+      <h2 class="page-title">Comunidade</h2>
+      <button id="social-my-profile" class="social-my-profile-btn">Meu perfil</button>
+    </div>
+    <div class="social-layout">
+      <div id="social-users-list" class="social-users-list"></div>
+      <div id="social-profile" class="social-profile"></div>
+    </div>
+  </section>
+
+  <div id="planet-panel" class="planet-panel hidden">
+    <div class="panel-card">
+      <button id="panel-close" class="panel-close">×</button>
+      <span id="panel-category" class="panel-category"></span>
+      <h2 id="panel-title" class="panel-title"></h2>
+
+      <div class="panel-author">
+        <img id="panel-author-avatar" src="" />
+        <span id="panel-author-name"></span>
+      </div>
+
+      <div class="panel-stats">
+        <span id="panel-likes"></span>
+        <span id="panel-rating"></span>
+        <span id="panel-views"></span>
+        <span id="panel-date"></span>
+      </div>
+
+      <p id="panel-description" class="panel-description"></p>
+      <div id="panel-tech" class="panel-tech"></div>
+      <div id="panel-images" class="panel-images"></div>
+      <div class="panel-actions">
+        <a id="panel-github" class="panel-btn panel-btn-github" href="#" target="_blank">GitHub</a>
+        <a id="panel-demo" class="panel-btn panel-btn-demo" href="#" target="_blank">Demo</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="commit-panel" class="commit-panel hidden">
+    <div class="commit-panel-card">
+      <button id="commit-panel-close" class="panel-close">×</button>
+      <span id="commit-version" class="commit-version-tag"></span>
+      <p id="commit-date" class="commit-date"></p>
+      <p id="commit-description"></p>
+      <div id="commit-tech" class="commit-tech"></div>
+    </div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

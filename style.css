@@ -1,0 +1,545 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: #05050a;
+  overflow: hidden;
+}
+
+#app {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.topbar {
+  position: fixed;
+  top: 24px;
+  left: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 14px 24px;
+  background: rgba(20, 20, 30, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  z-index: 10;
+}
+
+.logo {
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.5px;
+}
+
+.nav-links {
+  display: flex;
+  gap: 24px;
+  flex: 1;
+}
+
+.nav-links a {
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 0.2s ease;
+}
+
+.nav-links a:hover {
+  color: #ffffff;
+}
+
+.search-box input {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 8px 14px;
+  color: #fff;
+  font-size: 13px;
+  outline: none;
+  width: 180px;
+}
+
+.search-box input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.profile-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6a5cff, #ff5ca8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.controls-hint {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  background: rgba(20, 20, 30, 0.4);
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  z-index: 10;
+}
+
+.interaction-indicator {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 10px 18px;
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  z-index: 10;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.planet-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(5, 5, 10, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  backdrop-filter: blur(6px);
+}
+
+.panel-card {
+  position: relative;
+  width: 520px;
+  max-width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: #101018;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 32px;
+  color: #fff;
+}
+
+.panel-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.panel-category {
+  display: inline-block;
+  font-size: 12px;
+  color: #ff5ca8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.panel-title {
+  font-size: 26px;
+  margin-bottom: 12px;
+}
+
+.panel-description {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.panel-tech {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.panel-tech span {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+}
+
+.panel-images {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.panel-images img {
+  width: 100%;
+  border-radius: 10px;
+  display: block;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.panel-btn {
+  flex: 1;
+  text-align: center;
+  padding: 12px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.panel-btn-github {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.panel-btn-demo {
+  background: linear-gradient(135deg, #6a5cff, #ff5ca8);
+  color: #fff;
+}
+
+.page {
+  display: none;
+  min-height: 100vh;
+  padding: 140px 60px 60px;
+  color: #fff;
+}
+
+.page.active {
+  display: block;
+}
+
+#page-home {
+  padding: 0;
+  min-height: 0;
+}
+
+.page-title {
+  font-size: 24px;
+  margin-bottom: 30px;
+}
+
+.ranking-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.ranking-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.ranking-card:hover {
+  transform: translateY(-4px);
+}
+
+.ranking-planet {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  margin-bottom: 14px;
+}
+
+.ranking-card h3 {
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+.ranking-author {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.ranking-author img {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+}
+
+.ranking-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 12px;
+}
+
+.ranking-card p {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.5;
+}
+
+.commits-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+#commits-project-select {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.commits-timeline {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  overflow-x: auto;
+  padding: 60px 20px;
+  position: relative;
+}
+
+.commits-timeline::before {
+  content: "";
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  top: 50%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.commit-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+
+.commit-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #6a5cff;
+  border: 3px solid #05050a;
+}
+
+.commit-version {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+}
+
+.commit-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(5, 5, 10, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 25;
+  backdrop-filter: blur(6px);
+}
+
+.commit-panel-card {
+  position: relative;
+  width: 340px;
+  max-width: 90%;
+  background: #101018;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 28px;
+  color: #fff;
+}
+
+.commit-version-tag {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.commit-date {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  margin: 8px 0 14px;
+}
+
+.commit-tech {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  margin-top: 12px;
+}
+
+.social-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.social-my-profile-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.social-layout {
+  display: flex;
+  gap: 32px;
+}
+
+.social-users-list {
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.social-user-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 12px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.social-user-item img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.social-user-item h4 {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.social-user-item p {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.social-profile {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 28px;
+}
+
+.profile-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  margin-bottom: 16px;
+}
+
+.profile-bio {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+#follow-button {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #6a5cff, #ff5ca8);
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+.profile-projects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.profile-project-tag {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.panel-author {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.panel-author img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.panel-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 16px;
+}
