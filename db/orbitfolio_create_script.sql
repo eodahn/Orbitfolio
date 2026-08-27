@@ -2,12 +2,14 @@ create database orbitfolio;
 use orbitfolio;
 
 create table usuario (
-id_user int primary key not null,
+id_user int primary key auto_increment not null,
 nome varchar (50) not null,
 email varchar (30) not null,
-senha varchar (20) not null,
+senha varchar (255) not null,
 pfp mediumblob,
-descricao varchar (100)
+descricao varchar (100),
+github_token TEXT,
+github_login VARCHAR(100)
 );
 
 create table competencia (
@@ -29,7 +31,7 @@ references competencia (id_competencia)
 );
 
 create table portfolio (
-id_portfolio int primary key not null,
+id_portfolio int primary key auto_increment not null,
 id_user int not null,
 nome varchar(50) not null,
 data_criacao date,
@@ -39,7 +41,7 @@ references usuario (id_user)
 );
 
 create table projeto (
-id_projeto int primary key not null,
+id_projeto int primary key auto_increment not null,
 id_portfolio int not null,
 nome varchar (50) not null,
 descricao varchar (100) not null,
