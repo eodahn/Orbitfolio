@@ -1,5 +1,37 @@
 # Orbitfolio
 
+## Front-end rebuild
+
+O front-end atual é uma experiência espacial construída com Three.js: projetos são
+planetas determinísticos e a Home é navegável com teclado. O código novo fica em
+`src/`; os arquivos históricos em `assets/` foram preservados apenas como legado.
+
+### Executar
+
+```bash
+npm install
+npm run dev
+```
+
+Para validar a versão de produção:
+
+```bash
+npm run build
+npm run preview
+```
+
+### Arquitetura
+
+- `src/three`: universo, nave, voo, estrelas e fábrica procedural de planetas.
+- `src/api`: contratos e adaptadores; não pressupõe endpoints inexistentes.
+- `src/mocks`: dados exclusivos para desenvolvimento visual.
+- `src/pages` e `src/components`: interface, navegação e estados da aplicação.
+
+O backend atual não expõe API JSON para favoritos, curtidas, ranking, pesquisa
+social ou commits. Essas áreas mostram estados de integração pendente, sem fingir
+persistência local. Quando houver contratos documentados, substitua o adaptador
+de desenvolvimento em `src/api/index.js` por um adaptador HTTP.
+
 Universo 3D onde uma nave espacial viaja entre planetas. Cada planeta representa um projeto publicado por um usuário real da comunidade Orbitfolio.
 
 ## Como rodar

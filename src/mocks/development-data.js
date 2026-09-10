@@ -1,0 +1,14 @@
+// Development-only visual data. Remove this adapter when a JSON backend is available.
+export const developmentProjects = [
+  { id: "nebula-ui", name: "Nebula UI Kit", owner: { id: "u1", name: "Ana Souza" }, description: "Componentes visuais minimalistas para produtos digitais.", languages: { JavaScript: 58, CSS: 30, HTML: 12 }, githubUrl: "https://github.com", demoUrl: "https://example.com", likes: 218, views: 3400, rating: 4.8, updatedAt: "2026-08-14" },
+  { id: "pixel-runner", name: "Pixel Runner", owner: { id: "u2", name: "Lucas Lima" }, description: "Um jogo rápido em pixel art construído com Canvas.", languages: { JavaScript: 82, HTML: 10, CSS: 8 }, githubUrl: "https://github.com", likes: 356, views: 5100, rating: 4.6, updatedAt: "2026-08-02" },
+  { id: "devflow-cli", name: "DevFlow CLI", owner: { id: "u3", name: "Marina Dias" }, description: "Automação leve para o fluxo diário de desenvolvimento.", languages: { JavaScript: 68, Shell: 20, CSS: 12 }, githubUrl: "https://github.com", likes: 142, views: 1900, rating: 4.5, updatedAt: "2026-07-19" },
+  { id: "orbit-chat", name: "Orbit Chat", owner: { id: "u2", name: "Lucas Lima" }, description: "Comunidades pequenas em tempo real.", languages: { TypeScript: 58, CSS: 25, HTML: 17 }, githubUrl: "https://github.com", likes: 97, views: 1400, rating: 4.3, updatedAt: "2026-06-20" },
+  { id: "starmap-js", name: "StarMap.js", owner: { id: "u1", name: "Ana Souza" }, description: "Uma biblioteca para céus estrelados em experiências Three.js.", languages: { JavaScript: 48, Three: 37, CSS: 15 }, githubUrl: "https://github.com", likes: 271, views: 4200, rating: 4.9, updatedAt: "2026-08-30" }
+];
+
+export const developmentUsers = [
+  { id: "u1", name: "Ana Souza", bio: "Front-end e interfaces 3D.", projects: 2 },
+  { id: "u2", name: "Lucas Lima", bio: "Jogos e experiências interativas.", projects: 2 },
+  { id: "u3", name: "Marina Dias", bio: "Open source e ferramentas de desenvolvimento.", projects: 1 }
+];
