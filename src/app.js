@@ -12,5 +12,5 @@ const route = (render) => async () => { pauseUniverse(); await render(root); };
 registerRoute("/", async () => renderHome(root));
 registerRoute("/projects", route(renderProjects)); registerRoute("/progress", route(renderProgress)); registerRoute("/favorites", route(renderFavorites)); registerRoute("/featured", route(renderFeatured)); registerRoute("/account", route(renderAccount)); registerRoute("/social", route(renderSocial));
 registerRoute("/login", route((r) => renderLogin(r))); registerRoute("/register", route((r) => renderLogin(r, true)));
-registerRoute("/project/nebula-ui", route((r) => renderProject(r, "nebula-ui"))); registerRoute("/project/pixel-runner", route((r) => renderProject(r, "pixel-runner"))); registerRoute("/project/devflow-cli", route((r) => renderProject(r, "devflow-cli"))); registerRoute("/project/orbit-chat", route((r) => renderProject(r, "orbit-chat"))); registerRoute("/project/starmap-js", route((r) => renderProject(r, "starmap-js")));
+registerRoute("/project/:id", route((r) => renderProject(r, decodeURIComponent(location.pathname.split("/").pop()))));
 startRouter(); renderCurrent();

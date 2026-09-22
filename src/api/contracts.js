@@ -1,9 +1,3 @@
-/** Backend capability descriptors. No unsupported endpoint is called. */
-export const capabilities = Object.freeze({
-  jsonApi: false, auth: false, projects: false, social: false, favorites: false,
-  likes: false, rankings: false, commits: false,
-});
-
-export class ApiUnavailableError extends Error {
-  constructor(feature) { super(`A API para ${feature} ainda não está disponível.`); this.name = "ApiUnavailableError"; }
-}
+/** Public capabilities provided by the local Orbitfolio JSON API. */
+export const capabilities = Object.freeze({ jsonApi:true, auth:true, projects:true, social:true, favorites:true, likes:true, rankings:true, commits:true, search:true });
+export class ApiError extends Error { constructor(message, status = 500) { super(message); this.name = "ApiError"; this.status = status; } }

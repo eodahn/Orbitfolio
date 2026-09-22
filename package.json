@@ -6,8 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "node server.mjs",
+    "start": "npm run build && node server.mjs",
+    "migrate": "node -e \"import('./server/db.js').then(({openDatabase}) => openDatabase())\"",
+    "seed": "node -e \"Promise.all([import('./server/db.js'), import('./server/seed.js')]).then(([{openDatabase},{seedDevelopmentData}]) => seedDevelopmentData(openDatabase()))\""
   },
   "dependencies": { "three": "^0.160.1" },
-  "devDependencies": { "vite": "^6.1.0" }
+  "devDependencies": { "vite": "^6.1.0" },
+  "engines": { "node": ">=22.13.0" }
 }

@@ -2,3 +2,5 @@ node_modules/
 dist/
 .env
 .env.*
+data/*.sqlite
+data/*.sqlite-*

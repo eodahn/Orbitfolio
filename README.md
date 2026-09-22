@@ -1,5 +1,25 @@
 # Orbitfolio
 
+## Full-stack local
+
+Orbitfolio usa Vite/Three.js no navegador e Node.js 22+ com SQLite nativo no servidor. A API e o front-end rodam na mesma origem em produção; em desenvolvimento o Vite encaminha `/api` ao servidor local.
+
+```bash
+npm install
+npm run migrate
+npm run seed
+# terminal 1
+npm run server
+# terminal 2
+npm run dev
+```
+
+Para a versão integrada de produção: `npm run start` e abra `http://localhost:3000`.
+
+Não há secrets obrigatórios. `ORBITFOLIO_DATABASE_PATH` permite escolher o arquivo SQLite; `PORT` define a porta (padrão 3000); `SEED_DEMO=false` desativa a carga inicial. As migrations ficam em `database/migrations/`; o seed usa exclusivamente os mocks de desenvolvimento, que não são consumidos pelo navegador.
+
+Endpoints principais: sessão e autenticação (`/api/auth/*`), projetos (`/api/projects`), commits, curtidas e favoritos por projeto, usuários e follows, favoritos, progresso e ranking (`/api/rankings/featured`).
+
 ## Front-end rebuild
 
 O front-end atual é uma experiência espacial construída com Three.js: projetos são
