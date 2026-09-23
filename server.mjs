@@ -16,7 +16,7 @@ function csrf(req){
   const origin=req.headers.origin;
   // Vite proxies same-site browser requests during development. Keep the
   // production origin check while allowing only the documented local dev hosts.
-  const allowed=new Set([`http://${req.headers.host}`,"http://localhost:5173","http://127.0.0.1:5173"]);
+  const allowed=new Set([`http://${req.headers.host}`,"http://localhost:5173","http://127.0.0.1:5173","https://orbitfolio.onrender.com"]);
   if(origin && !allowed.has(origin))throw new ApiError(403,"Origem inválida.");
 }
 
