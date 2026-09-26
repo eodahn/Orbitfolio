@@ -1,5 +1,7 @@
 # Orbitfolio
 
+A implementação atual de Conta, amigos, privacidade e universo 3D está documentada em [docs/IMPLEMENTACAO.md](docs/IMPLEMENTACAO.md), incluindo testes e limitações. As seções históricas abaixo sobre mocks e ausência de API descrevem versões anteriores.
+
 ## Full-stack local
 
 Orbitfolio usa Vite/Three.js no navegador e Node.js 22+ com SQLite nativo no servidor. A API e o front-end rodam na mesma origem em produção; em desenvolvimento o Vite encaminha `/api` ao servidor local.
