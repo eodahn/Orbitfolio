@@ -13,7 +13,8 @@
     "seed": "node -e \"Promise.all([import('./server/db.js'), import('./server/seed.js')]).then(([{openDatabase},{seedDevelopmentData}]) => seedDevelopmentData(openDatabase()))\"",
     "test": "node --test tests/*.test.js",
     "test:browser": "npm run build && node tests/browser.mjs",
-    "test:world": "node tests/world-browser.mjs"
+    "test:world": "node tests/world-browser.mjs",
+    "test:projects": "node tests/projects-browser.mjs"
   },
   "dependencies": {
     "three": "^0.160.1"

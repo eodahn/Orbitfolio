@@ -24,7 +24,9 @@ export function planetIdentity(project) {
     Object.keys(project.languages || {}).length
       ? project.languages
       : { Unknown: 100 },
-  ).sort((a, b) => b[1] - a[1]);
+  )
+    .map(([name, value]) => [name, value == null ? 1 : Number(value)])
+    .sort((a, b) => b[1] - a[1]);
   const total =
     entries.reduce((sum, [, amount]) => sum + Number(amount || 0), 0) || 1;
   const [dominantLanguage, dominantAmount] = entries[0];
@@ -140,3 +142,11 @@ const cloudMaterial = new THREE.ShaderMaterial({
  float noise(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}
  void main(){vec3 p=vPosition*5.0;float n=noise(p)*0.6+noise(p*2.1)*0.3+noise(p*4.2)*0.1;float a=0.06+smoothstep(0.35,0.75,n)*0.48;gl_FragColor=vec4(0.78,0.84,1.0,a);}`,
 });
+
+export function disposePlanet(planet) {
+  planet.traverse((node) => {
+    node.geometry?.dispose();
+    if (node.material && node.material !== cloudMaterial)
+      node.material.dispose();
+  });
+}

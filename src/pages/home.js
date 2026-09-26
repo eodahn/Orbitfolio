@@ -1,8 +1,42 @@
+import { mountProject } from "./project.js";
 import { shell } from "../components/shell.js";
 import { api } from "../api/index.js";
 import { Universe } from "../three/universe.js";
 import { navigate } from "../router/router.js";
 let universe, homeNode;
+function closeHomeProject(immediate = false) {
+  homeNode?.querySelector("[data-home-panel]")?.remove();
+  homeNode?.classList.remove("has-project");
+  universe?.restoreFocus(immediate);
+  universe?.resize();
+  homeNode?.querySelector("canvas")?.focus();
+}
+async function openHomeProject(project) {
+  closeHomeProject(true);
+  homeNode.classList.add("has-project");
+  const panel = document.createElement("section");
+  panel.className = "home-project-panel";
+  panel.dataset.homePanel = "";
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-label", "Informações do planeta");
+  panel.innerHTML =
+    '<button class="button home-project-close" data-home-close aria-label="Fechar projeto">×</button><div data-home-details><p role="status">Carregando projeto...</p></div>';
+  homeNode.append(panel);
+  panel.querySelector("button").onclick = () => closeHomeProject();
+  panel.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeHomeProject();
+  });
+  panel.querySelector("button").focus();
+  universe.resize();
+  universe.focusPlanet(project.id);
+  await mountProject(panel.querySelector("[data-home-details]"), project.id, {
+    home: true,
+    onDeleted: () => closeHomeProject(),
+  });
+}
+addEventListener("orbitfolio:project-deleted", (event) =>
+  universe?.removeProject(event.detail),
+);
 export async function renderHome(root) {
   if (homeNode) {
     root.replaceChildren(homeNode);
@@ -21,7 +55,7 @@ export async function renderHome(root) {
   homeNode = root.firstElementChild;
   universe = new Universe(
     canvas,
-    (project) => navigate(`/project/${project.id}`),
+    (project) => openHomeProject(project),
     () => {
       sessionStorage.setItem("orbitfolio-flight-hint-dismissed", "true");
       hint.classList.add("is-dismissed");
@@ -31,6 +65,7 @@ export async function renderHome(root) {
   universe.start();
 }
 export function pauseUniverse() {
+  closeHomeProject(true);
   universe?.stop();
   homeNode?.remove();
 }

@@ -1,3 +1,5 @@
+import { renderCreateProject } from "./pages/create-project.js";
+import { startPlanetPreviews } from "./three/preview.js";
 import "./styles/main.css";
 import "./styles/auth.css";
 import "./styles/states.css";
@@ -31,6 +33,7 @@ const route = (render) => async () => {
 };
 registerRoute("/", async () => renderHome(root));
 registerRoute("/projects", route(renderProjects));
+registerRoute("/projects/new", route(renderCreateProject));
 registerRoute("/progress", route(renderProgress));
 registerRoute("/favorites", route(renderFavorites));
 registerRoute("/featured", route(renderFeatured));
@@ -56,5 +59,6 @@ registerRoute(
     renderProfile(r, decodeURIComponent(location.pathname.split("/").pop())),
   ),
 );
+startPlanetPreviews(root);
 startRouter();
 renderCurrent();

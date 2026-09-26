@@ -77,3 +77,65 @@ Para repetir os testes de navegador: `npm ci`, `npx playwright install chromium`
 - As preferências ocultam as categorias no perfil, não tornam uma relação social anônima em todos os perfis: uma relação pode aparecer na lista pública da outra pessoa. O estado da relação com o próprio visitante permanece disponível para seguir/deixar de seguir.
 
 - O `pnpm-workspace.yaml` preexistente contém valores inválidos de configuração de builds; a validação utilizou npm. Os metadados novos também foram incluídos no lockfile pnpm sem alterar essas permissões/configurações.
+
+# Atualização — criação de projetos, GitHub e progresso
+
+Esta seção substitui as limitações anteriores sobre importação por tamanho, commits e posições após reload.
+
+## Fluxos implementados
+
+- Criar projeto começa com “Deseja integrar este projeto com o GitHub?”. Integração configurada conduz ao OAuth, seleção paginada de repositório e revisão antes de gravar.
+- Sem integração: link de repositório público é inspecionado por API oficial, sem token e sem habilitar commits autenticados. Links de outros sites conduzem à personalização manual; não há scraping ou requisições arbitrárias a URLs fornecidas.
+- Personalizar: nome obrigatório, descrição opcional, linhas de linguagens adicionáveis/removíveis, porcentagens opcionais. Valores informados ficam entre 0 e 100; todas preenchidas exigem soma 100 ± 0,5. Campos omitidos são `null`, sem inventar porcentagens. A aparência 3D usa pesos de fallback apenas para desenhar cores.
+- A página Projetos usa `GET /api/projects/mine`. Exclusão tem diálogo nativo de confirmação e validação de proprietário no servidor; foreign keys removem likes, favoritos e registros dependentes. O evento de exclusão remove imediatamente o objeto Three.js sem recriar a cena.
+- Home abre um painel translúcido e suspende a física durante o foco. A distância é `raio × margem / sin(min(FOVvertical/2, FOVhorizontal/2))`, considerando atmosfera e viewport disponível ao lado/acima do painel. Interpolação de posição e quaternion enquadra e restaura a câmera. Controles voltam depois da transição.
+- Cards, perfis, favoritos e detalhe usam snapshots de `createPlanet`; um único WebGLRenderer atende os previews visíveis. Cache máximo de 60 imagens, IntersectionObserver, descarte de geometrias/materiais exclusivos após o snapshot e descarte do contexto ao sair da página.
+- Progresso consulta somente projetos próprios integrados. A timeline carrega 30 commits por página, com mensagem, autor/avatar, data, link, SHA e tooltip acessível por foco e hover.
+
+## Banco e arquitetura
+
+Nova migration: `003_projects_github.sql`. Acrescenta vínculo GitHub, privacidade do repositório, branch padrão, bytes por linguagem, posição XYZ e `description_text`. Este último preserva a coluna antiga e seu CHECK já aplicado, permitindo descrição opcional sem reconstruir tabelas existentes. Leituras usam o novo campo quando presente. Linguagens permanecem no JSON existente, agora aceitando `null`; bytes importados ficam em JSON separado.
+
+Tabelas novas: `github_connections` (token criptografado), `github_oauth_states` (estado de uso único vinculado à sessão, verificador criptografado, validade de 10 minutos) e `project_imports` (prévia privada do usuário, validade de 30 minutos). A criação consome a prévia em transação e revalida no GitHub integrações autenticadas. O frontend não pode forjar o vínculo enviando flags de integração.
+
+Migrations agora são transacionais. Não foram alteradas migrations já aplicadas. O seed passou a exigir `SEED_DEMO=true`; produção não recebe dados simulados automaticamente.
+
+Posições orbitais são atribuídas a partir do ID, com distâncias mínimas e tentativas limitadas, e persistidas em `orbit_x/y/z`. Projetos antigos recebem posição no próximo início do servidor. Novos projetos não deslocam as posições já gravadas. Colisões alteram posições em memória durante a sessão; ao recarregar, volta-se à posição orbital gravada, enquanto a nave recebe novo spawn seguro.
+
+## Endpoints
+
+| Método e caminho | Comportamento |
+|---|---|
+| `GET /api/projects` | Universo/listagens; remove projetos privados de terceiros |
+| `GET /api/projects/mine` | Somente projetos do usuário autenticado |
+| `POST /api/projects` | Manual ou confirmação de prévia importada; dono vem da sessão |
+| `DELETE /api/projects/:id` | Exclusão exclusiva do dono, com cascade |
+| `GET /api/projects/:id` | Detalhe; projeto privado de terceiro exige acesso GitHub |
+| `GET /api/github/status` | Disponibilidade e conta conectada, sem credenciais |
+| `POST /api/github/connect` | Inicia OAuth com state e PKCE |
+| `GET /api/github/callback` | Troca código no servidor e redireciona sem tokens |
+| `DELETE /api/github/disconnect` | Remove credencial e estados locais |
+| `GET /api/github/repositories?page=N` | Até 30 repositórios acessíveis pela credencial do usuário |
+| `POST /api/github/repository/inspect` | Metadados/linguagens e prévia para confirmação |
+| `GET /api/progress` | Projetos próprios com integração habilitada |
+| `GET /api/projects/:id/commits?page=N` | Commits reais mediante autorização GitHub do visitante |
+
+## Segurança, versões e configuração
+
+Requer `APP_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` e `GITHUB_TOKEN_ENCRYPTION_KEY`; instruções de callback e disco persistente estão no README. Nunca configurar como variáveis `VITE_*`. Tokens ficam cifrados com AES-256-GCM, IV aleatório e AAD com ID do usuário; a chave fica apenas no ambiente. Trocar/perder a chave requer reconexão dos usuários. Credenciais não são devolvidas em HTML, respostas JSON, query strings ou logs. O código OAuth temporário é recebido apenas no callback padrão do provedor.
+
+Acesso a commits usa a credencial do visitante e valida o ID do repositório. Nunca toma emprestado o token do proprietário. Metadados de projetos privados são omitidos de listagens públicas e contagens de projetos de terceiros. A preferência de privacidade social permanece independente. Respostas de API têm `Cache-Control: no-store`; erros remotos são traduzidos, sem ecoar payloads sensíveis.
+
+Versão prioriza tag que aponta diretamente ao SHA (até 100 tags consultadas). Depois, até três releases recentes são comparadas com o commit mais recente da página, em consultas limitadas a 100 commits cada. Só se a resposta comprovar ancestralidade aparece `após <tag>`. Fora dessa janela, ou sem evidência de ancestralidade, exibe-se SHA curto. Não se inventa versão por proximidade de datas.
+
+## Testes e limites restantes
+
+Validados: testes unitários de persistência após reabertura do SQLite, linguagens opcionais, soma de porcentagens, mapping de bytes GitHub, exclusão/cascade e autorização; OAuth state/PKCE, criptografia vinculada ao usuário, credencial do visitante, bloqueio privado, rate limit e fallback SHA; regressão social e física; build; navegador social, universo e novo fluxo manual/exclusão/previews. O teste de projetos também cobre tooltip com foco de teclado e layout móvel. A importação pública de `eodahn/Orbitfolio` foi consultada na API real (nome, tamanho e três linguagens), sem habilitar integração autenticada.
+
+O consentimento OAuth de ponta a ponta com conta real **não foi executado**, pois não foram fornecidas as credenciais do OAuth App do Orbitfolio. As rotas reais estão implementadas; o servidor sem configuração mostra indisponibilidade. Testes de autorização privada usam respostas controladas somente no ambiente de teste. Não declarar integração de produção conectada antes de configurar e validar o OAuth no hosting.
+
+Limites: sem refresh automático de tokens OAuth revogados (reconexão explícita); tags/releases com consultas limitadas; metadados, tamanho, branch e flag privada são um retrato da importação, sem sincronização periódica de alterações posteriores do repositório. Um repositório tornado privado depois de importado publicamente exige excluir/reimportar o projeto para ocultar os metadados previamente publicados; commits continuam protegidos por autorização ao vivo. Dados de planetas privados nunca são deliberadamente publicados ao importar como privado. Avatares seguem por URL. Testes gráficos usam Chromium com renderização de software; outros navegadores e desempenho em dispositivos físicos não foram medidos.
+
+Arquivos novos: migration 003; `server/github.js`, `server/project-data.js`, `shared/world-config.js`; `src/pages/create-project.js`, `src/components/dialog.js`, `src/components/commit-timeline.js`, `src/three/preview.js`; `.env.example`; `tests/projects-github.test.js`, `tests/projects-browser.mjs`.
+
+Arquivos ajustados: servidor/API e serializadores, migrations runner, páginas de projetos/Home, fábrica/universo/configuração 3D, cards, estilos, scripts de teste, teste de universo, `.gitignore`, README e este documento. Todas as alterações permanecem em `feature/frontend-rebuild`.

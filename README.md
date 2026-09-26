@@ -1,117 +1,64 @@
 # Orbitfolio
 
-A implementação atual de Conta, amigos, privacidade e universo 3D está documentada em [docs/IMPLEMENTACAO.md](docs/IMPLEMENTACAO.md), incluindo testes e limitações. As seções históricas abaixo sobre mocks e ausência de API descrevem versões anteriores.
+Portfólio social espacial em Vite, JavaScript, Three.js, Node.js 22.13+ e SQLite. Projetos persistidos tornam-se planetas; Conta reúne projetos, seguidores, seguindo, amigos, curtidas, favoritos e privacidade.
 
-## Full-stack local
+## Executar
 
-Orbitfolio usa Vite/Three.js no navegador e Node.js 22+ com SQLite nativo no servidor. A API e o front-end rodam na mesma origem em produção; em desenvolvimento o Vite encaminha `/api` ao servidor local.
-
-```bash
-npm install
-npm run migrate
-npm run seed
-# terminal 1
+```sh
+npm ci
 npm run server
-# terminal 2
+# Em outro terminal:
 npm run dev
 ```
 
-Para a versão integrada de produção: `npm run start` e abra `http://localhost:3000`.
+Para a versão integrada: `npm start` e abra `http://localhost:3000`. As migrations são aplicadas automaticamente na abertura do banco. Node não carrega `.env` automaticamente: configure as variáveis no ambiente do processo/hosting ou use `node --env-file=.env server.mjs` no desenvolvimento.
 
-Não há secrets obrigatórios. `ORBITFOLIO_DATABASE_PATH` permite escolher o arquivo SQLite; `PORT` define a porta (padrão 3000); `SEED_DEMO=false` desativa a carga inicial. As migrations ficam em `database/migrations/`; o seed usa exclusivamente os mocks de desenvolvimento, que não são consumidos pelo navegador.
+Por padrão, nenhum mock é carregado. `SEED_DEMO=true` habilita dados demonstrativos somente quando o banco está vazio. `ORBITFOLIO_DATABASE_PATH` seleciona o arquivo SQLite; em produção, configure um **disco persistente** e mantenha backups. Sem persistência do disco, um redeploy pode perder o banco. `PORT` é 3000 por padrão.
 
-Endpoints principais: sessão e autenticação (`/api/auth/*`), projetos (`/api/projects`), commits, curtidas e favoritos por projeto, usuários e follows, favoritos, progresso e ranking (`/api/rankings/featured`).
+## Projetos e GitHub
 
-## Front-end rebuild
+“Adicionar projeto” oferece integração GitHub ou continuação por link/manual. Links públicos do GitHub são lidos pela API oficial sem conexão de conta. “Personalizar” permite editar nome, descrição e linguagens, com porcentagens opcionais. A página Projetos lista apenas os projetos do usuário autenticado. Exclusão exige confirmação e autorização do proprietário no servidor.
 
-O front-end atual é uma experiência espacial construída com Three.js: projetos são
-planetas determinísticos e a Home é navegável com teclado. O código novo fica em
-`src/`; os arquivos históricos em `assets/` foram preservados apenas como legado.
+A integração autenticada usa um **OAuth App do próprio Orbitfolio**. A conexão GitHub utilizada pelo assistente para editar este repositório não configura esse OAuth App.
 
-### Executar
+Configure no servidor:
 
-```bash
-npm install
-npm run dev
-```
+- `APP_ORIGIN`: origem pública exata, sem barra final; por exemplo `https://orbitfolio.onrender.com`.
+- `GITHUB_CLIENT_ID` e `GITHUB_CLIENT_SECRET`: credenciais do OAuth App.
+- `GITHUB_TOKEN_ENCRYPTION_KEY`: chave estável de 32 bytes, representada por 64 caracteres hexadecimais; gere com `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` e guarde em segredo.
+- Callback do OAuth App: `APP_ORIGIN/api/github/callback`, por exemplo `https://orbitfolio.onrender.com/api/github/callback`.
 
-Para validar a versão de produção:
+O arquivo `.env.example` contém somente nomes e exemplos não secretos. Credenciais ausentes deixam a integração indisponível de forma explícita; criação manual e leitura de links públicos continuam funcionando. O OAuth usa `state`, PKCE S256 e tokens criptografados com AES-256-GCM no banco. O escopo `repo` dá acesso a repositórios privados e também inclui escrita no GitHub; a aplicação implementada só consulta os repositórios. Revogue o OAuth App no GitHub se quiser revogar a autorização, além de desconectar localmente.
 
-```bash
+Progresso lista apenas projetos próprios integrados. Commits vêm da API real, paginados, e usam sempre a credencial GitHub do visitante. Projetos de repositórios privados não aparecem nas listagens públicas. Mais detalhes e limites de sincronização em [docs/IMPLEMENTACAO.md](docs/IMPLEMENTACAO.md).
+
+## Universo
+
+W/S aceleram e freiam, A/D giram, Espaço/Shift controlam o eixo vertical. Clique em um planeta para aproximar a câmera e abrir suas informações sobre o universo. Fechar devolve o controle da nave. Posições iniciais dos planetas são persistidas no banco; movimentos causados por colisões permanecem durante a sessão. O spawn da nave pode mudar a cada nova inicialização.
+
+Os previews das outras páginas são snapshots Three.js gerados pela mesma fábrica de planetas. Há um renderizador compartilhado para previews, cache limitado e renderização sob demanda.
+
+## Testes
+
+```sh
+npm test
 npm run build
-npm run preview
+npx playwright install chromium
+npm run test:browser
+npm run test:world
+npm run test:projects
 ```
 
-### Arquitetura
+`CHROMIUM_EXECUTABLE` pode apontar para um Chromium instalado. Os testes usam bancos temporários. Reserve as portas 3091 (social), 3000/5173 (universo) e 3092/5174 (projetos). Testes OAuth usam respostas controladas exclusivamente no código de teste; não substituem a validação de consentimento com um OAuth App configurado.
 
-- `src/three`: universo, nave, voo, estrelas e fábrica procedural de planetas.
-- `src/api`: contratos e adaptadores; não pressupõe endpoints inexistentes.
-- `src/mocks`: dados exclusivos para desenvolvimento visual.
-- `src/pages` e `src/components`: interface, navegação e estados da aplicação.
+## Estrutura atual
 
-O backend atual não expõe API JSON para favoritos, curtidas, ranking, pesquisa
-social ou commits. Essas áreas mostram estados de integração pendente, sem fingir
-persistência local. Quando houver contratos documentados, substitua o adaptador
-de desenvolvimento em `src/api/index.js` por um adaptador HTTP.
+- `server.mjs`, `server/`: API, autenticação, projetos, GitHub, privacidade e SQLite.
+- `database/migrations/`: evolução versionada do banco.
+- `shared/`: configuração compartilhada de escala e limites.
+- `src/api/`, `src/pages/`, `src/components/`: cliente HTTP, páginas e componentes.
+- `src/three/`: cena, física, previews e fábrica de planetas.
+- `tests/`: regressão, integração e navegador.
+- `assets/`: versão histórica, preservada; não é a aplicação Vite atual.
 
-Universo 3D onde uma nave espacial viaja entre planetas. Cada planeta representa um projeto publicado por um usuário real da comunidade Orbitfolio.
-
-## Como rodar
-
-Abra a pasta com a extensão Live Server (VS Code) e acesse `index.html`.
-Como os módulos usam `import`/`export`, é necessário abrir via servidor local (Live Server resolve isso automaticamente).
-
-## Estrutura
-
-- `index.html` — estrutura da página, as 4 seções/páginas e os painéis
-- `style.css` — todo o visual, incluindo painéis, grid de ranking, timeline de commits e página social
-- `main.js` — ponto de entrada, liga todos os módulos e roda o loop de animação
-- `scene.js` — cria a cena Three.js
-- `camera.js` — cria a câmera e faz ela seguir a nave suavemente (inclusive no eixo Y)
-- `lights.js` — cria as luzes da cena
-- `stars.js` — gera as estrelas de fundo aleatoriamente
-- `spaceship.js` — monta a nave com geometrias básicas
-- `controls.js` — captura as teclas W A S D, Espaço e Shift esquerdo
-- `physics.js` — aplica velocidade, inércia e rotação manualmente, incluindo eixo vertical
-- `planets.js` — cria os planetas (a partir dos projetos) e controla o destaque por proximidade
-- `database.js` — "banco de dados" simulado: usuários, projetos e commits
-- `api.js` — camada de acesso aos dados; hoje lê de `database.js`, no futuro pode virar chamadas de API sem mudar quem a usa
-- `router.js` — troca qual página fica visível quando um link do menu é clicado
-- `ranking.js` — monta o grid de projetos mais populares
-- `commits.js` — monta a timeline de commits de um projeto selecionado
-- `social.js` — monta a lista de usuários, perfis e o sistema de seguir
-- `ui.js` — controla o painel de detalhes do projeto e o indicador de interação
-- `utils.js` — funções reutilizáveis (matemática, cor, data)
-
-## Páginas
-
-- **Início** — a experiência principal: pilotar a nave e explorar os planetas/projetos
-- **Ranking** — grid com os projetos mais populares da comunidade
-- **Commits** — histórico de versões de um projeto, inspirado no GitHub
-- **Social** — perfis de usuários, seguir/deixar de seguir e acesso ao próprio perfil
-
-## Controles
-
-- `W` acelera / `S` freia
-- `A` gira à esquerda / `D` gira à direita
-- `Espaço` sobe / `Shift esquerdo` desce
-- Clique em um planeta próximo para abrir o painel do projeto
-
-## Dados simulados
-
-`database.js` simula 3 usuários e 5 projetos com curtidas, avaliações, visualizações, data de publicação e histórico de commits. Quando o backend existir, basta reescrever as funções de `api.js` para buscar de uma API real — nenhum outro arquivo precisa mudar.
-
-## Simplificações conscientes desta versão
-
-- A timeline de commits mostra apenas uma linha principal (sem os ramos/branches curvos do wireframe), para manter o código simples de entender.
-- "Seguir" é guardado apenas em memória (Set), reiniciando ao recarregar a página — não há login real ainda.
-- Ao clicar em um projeto na página Social ou no Ranking, o painel de detalhes abre diretamente (em vez de mover a nave 3D até o planeta).
-
-## Próximos passos sugeridos
-
-- Trocar `api.js` por chamadas reais de API/backend
-- Adicionar autenticação e cadastro
-- Persistir o "seguir" e as avaliações em um banco de dados
-- Levar a nave até o planeta ao clicar em um projeto fora da página Início
-- Adicionar texturas nos planetas e sons de motor
-"# Orbitfolio" 
+O projeto mantém npm como caminho validado. O `pnpm-workspace.yaml` histórico tem valores inválidos de configuração de builds e não foi usado nesta validação.

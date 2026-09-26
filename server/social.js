@@ -41,7 +41,8 @@ export function profileSection(db, targetId, category, viewerId) {
     projects: db
       .prepare(query)
       .all(targetId)
-      .map((p) => publicProject(db, p, viewerId)),
+      .map((p) => publicProject(db, p, viewerId))
+      .filter(Boolean),
   };
 }
 export function updatePrivacy(db, user, input) {

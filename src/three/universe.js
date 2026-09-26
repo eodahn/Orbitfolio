@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { createPlanet } from "./planet-factory.js";
+import { framingDistance } from "./preview.js";
+import { createPlanet, disposePlanet } from "./planet-factory.js";
 import { WORLD, availablePosition, randomPosition } from "./world.js";
 import { stepPhysics } from "./physics.js";
 import { createShip } from "./ship.js";
@@ -69,7 +70,18 @@ export class Universe {
       ),
     );
   }
+  removeProject(id) {
+    const removed = this.planets.find((p) => p.userData.project.id === id);
+    if (!removed) return;
+    this.scene.remove(removed);
+    disposePlanet(removed);
+    this.planets = this.planets.filter((p) => p !== removed);
+  }
   setProjects(projects) {
+    const ids = new Set(projects.map((p) => p.id));
+    for (const planet of [...this.planets])
+      if (!ids.has(planet.userData.project.id))
+        this.removeProject(planet.userData.project.id);
     const existing = new Map(
       this.planets.map((p) => [p.userData.project.id, p]),
     );
@@ -79,10 +91,12 @@ export class Universe {
         continue;
       }
       const planet = createPlanet(project, this.lowPower ? 20 : 32);
-      const position = availablePosition(
-        planet.userData.radius,
-        this.spawned ? [...this.planets, this.ship] : this.planets,
-      );
+      const position = Array.isArray(project.orbit)
+        ? new THREE.Vector3(...project.orbit)
+        : availablePosition(
+            planet.userData.radius,
+            this.spawned ? [...this.planets, this.ship] : this.planets,
+          );
       if (!position) {
         console.warn("Universo cheio: planeta não posicionado", project.id);
         continue;
@@ -127,6 +141,7 @@ export class Universe {
     addEventListener("keydown", (event) => {
       if (
         !this.running ||
+        this.focus ||
         ["INPUT", "TEXTAREA", "SELECT"].includes(
           document.activeElement?.tagName,
         )
@@ -153,6 +168,7 @@ export class Universe {
     addEventListener("keyup", (event) => this.keys.delete(event.code));
     addEventListener("resize", () => this.resize());
     this.canvas.addEventListener("pointerdown", (event) => {
+      if (this.focus) return;
       const rect = this.canvas.getBoundingClientRect();
       this.pointer.set(
         ((event.clientX - rect.left) / rect.width) * 2 - 1,
@@ -174,6 +190,75 @@ export class Universe {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
+    if (this.focus && !this.focus.returning) this.focusTarget();
+  }
+  focusTarget() {
+    const f = this.focus;
+    if (!f) return;
+    const p = f.planet;
+    const direction = this.camera.position.clone().sub(p.position).normalize();
+    if (direction.lengthSq() < 0.01) direction.set(0, 0, 1);
+    f.target = p.position
+      .clone()
+      .addScaledVector(
+        direction,
+        framingDistance(
+          p.userData.radius * 1.025,
+          this.camera.fov,
+          this.camera.aspect,
+        ),
+      );
+    const camera = this.camera.clone();
+    camera.position.copy(f.target);
+    camera.lookAt(p.position);
+    f.targetQuaternion = camera.quaternion.clone();
+    f.start = this.camera.position.clone();
+    f.startQuaternion = this.camera.quaternion.clone();
+    f.elapsed = 0;
+  }
+  focusPlanet(id) {
+    const planet = this.planets.find((p) => p.userData.project.id === id);
+    if (!planet) return;
+    this.keys.clear();
+    this.focus = {
+      planet,
+      savedPosition: this.camera.position.clone(),
+      savedQuaternion: this.camera.quaternion.clone(),
+      returning: false,
+    };
+    this.focusTarget();
+  }
+  restoreFocus(immediate = false) {
+    if (!this.focus) return;
+    const f = this.focus;
+    this.keys.clear();
+    if (immediate) {
+      this.camera.position.copy(f.savedPosition);
+      this.camera.quaternion.copy(f.savedQuaternion);
+      this.focus = null;
+      return;
+    }
+    Object.assign(f, {
+      returning: true,
+      start: this.camera.position.clone(),
+      startQuaternion: this.camera.quaternion.clone(),
+      target: f.savedPosition,
+      targetQuaternion: f.savedQuaternion,
+      elapsed: 0,
+    });
+  }
+  updateFocus(delta) {
+    const f = this.focus;
+    f.elapsed = Math.min(0.8, f.elapsed + delta);
+    const t = f.elapsed / 0.8,
+      s = t * t * (3 - 2 * t);
+    this.camera.position.lerpVectors(f.start, f.target, s);
+    this.camera.quaternion.slerpQuaternions(
+      f.startQuaternion,
+      f.targetQuaternion,
+      s,
+    );
+    if (t === 1 && f.returning) this.focus = null;
   }
   updateFlight(delta) {
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(
@@ -192,6 +277,12 @@ export class Universe {
   frame = () => {
     if (!this.running) return;
     const delta = Math.min(this.clock.getDelta(), 0.05);
+    if (this.focus) {
+      this.updateFocus(delta);
+      this.renderer.render(this.scene, this.camera);
+      this.frameId = requestAnimationFrame(this.frame);
+      return;
+    }
     this.updateFlight(delta);
     stepPhysics([this.ship, ...this.planets], delta);
     const desired = this.ship.position

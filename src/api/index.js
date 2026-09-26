@@ -1,11 +1,19 @@
 import { capabilities, ApiError } from "./contracts.js";
 async function request(path, options = {}) {
-  const response = await fetch(path, {
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json", ...(options.headers ?? {}) },
-    ...options,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  let response;
+  try {
+    response = await fetch(path, {
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers ?? {}),
+      },
+      ...options,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+  } catch {
+    throw new ApiError("Conexão perdida. Tente novamente.", 0);
+  }
   const data =
     response.status === 204 ? {} : await response.json().catch(() => ({}));
   if (!response.ok)
@@ -18,6 +26,9 @@ async function request(path, options = {}) {
 export const api = {
   capabilities,
   projects: {
+    mine: async () => (await request("/api/projects/mine")).projects,
+    delete: (id) =>
+      request(`/api/projects/${encodeURIComponent(id)}`, { method: "DELETE" }),
     list: async (query = "") =>
       (
         await request(
@@ -96,7 +107,21 @@ export const api = {
         method: "DELETE",
       }),
   },
+  github: {
+    status: () => request("/api/github/status"),
+    connect: () => request("/api/github/connect", { method: "POST" }),
+    disconnect: () => request("/api/github/disconnect", { method: "DELETE" }),
+    repositories: (page = 1) =>
+      request(`/api/github/repositories?page=${page}`),
+    inspect: (input) =>
+      request("/api/github/repository/inspect", {
+        method: "POST",
+        body: input,
+      }),
+  },
   commits: {
+    page: (id, page = 1) =>
+      request(`/api/projects/${encodeURIComponent(id)}/commits?page=${page}`),
     list: async (id) =>
       (await request(`/api/projects/${encodeURIComponent(id)}/commits`))
         .commits,

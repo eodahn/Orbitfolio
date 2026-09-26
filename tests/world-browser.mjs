@@ -9,6 +9,7 @@ const server = spawn(process.execPath, ["server.mjs"], {
   env: {
     ...process.env,
     PORT: "3000",
+    SEED_DEMO: "true",
     ORBITFOLIO_DATABASE_PATH: join(temp, "db.sqlite"),
   },
   stdio: "ignore",

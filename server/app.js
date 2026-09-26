@@ -1,4 +1,9 @@
 import {
+  normalizeLanguages,
+  validProjectUrl,
+  ensureOrbits,
+} from "./project-data.js";
+import {
   createHash,
   randomBytes,
   randomUUID,
@@ -82,7 +87,7 @@ export function publicUser(db, user, viewerId = null) {
     username: record.username || `viajante-${user.id}`,
     avatarUrl: record.avatar_url,
     projects: count(
-      "SELECT COUNT(*) AS count FROM projects WHERE owner_id = ?",
+      `SELECT COUNT(*) AS count FROM projects WHERE owner_id = ? ${viewerId === user.id ? "" : "AND github_private=0"}`,
     ),
     followers: visible("followers")
       ? count("SELECT COUNT(*) AS count FROM follows WHERE followed_id = ?")
@@ -104,8 +109,17 @@ export function publicUser(db, user, viewerId = null) {
     ...(user.id === viewerId ? { privacy } : {}),
   };
 }
-export function publicProject(db, project, viewerId = null) {
-  if (!project) return null;
+export function publicProject(
+  db,
+  project,
+  viewerId = null,
+  authorized = false,
+) {
+  if (
+    !project ||
+    (project.github_private && project.owner_id !== viewerId && !authorized)
+  )
+    return null;
   const owner = db
     .prepare("SELECT * FROM users WHERE id = ?")
     .get(project.owner_id);
@@ -113,7 +127,19 @@ export function publicProject(db, project, viewerId = null) {
     id: project.id,
     sizeBytes: project.size_bytes,
     name: project.name,
-    description: project.description,
+    description: project.description_text ?? project.description,
+    repositoryUrl:
+      project.repository_url || project.github_url || project.demo_url,
+    orbit:
+      project.orbit_x == null
+        ? null
+        : [project.orbit_x, project.orbit_y, project.orbit_z],
+    github: {
+      integrationEnabled: !!project.github_integration_enabled,
+      private: !!project.github_private,
+      fullName: project.github_repository_full_name,
+      defaultBranch: project.github_default_branch,
+    },
     languages: JSON.parse(project.languages_json),
     githubUrl: project.github_url,
     demoUrl: project.demo_url,
@@ -154,7 +180,7 @@ export function createSession(db, userId) {
   return { token, expiresAt };
 }
 export function sessionCookie(token, expiresAt) {
-  return `orbitfolio_session=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Expires=${new Date(expiresAt).toUTCString()}`;
+  return `orbitfolio_session=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Expires=${new Date(expiresAt).toUTCString()}${process.env.NODE_ENV === "production" ? "; Secure" : ""}`;
 }
 export function clearSession(db, header) {
   const token = parseCookies(header).orbitfolio_session;
@@ -204,57 +230,91 @@ export function login(db, input) {
   return user;
 }
 export function createProject(db, user, input) {
-  const name = String(input.name ?? "").trim(),
-    description = String(input.description ?? "").trim();
+  requireUser(user);
+  let metadata = null;
+  if (input.importId) {
+    const row = db
+      .prepare(
+        "SELECT * FROM project_imports WHERE id=? AND user_id=? AND expires_at>?",
+      )
+      .get(input.importId, user.id, Date.now());
+    if (!row)
+      throw new ApiError(
+        422,
+        "Importação expirada. Leia o repositório novamente.",
+      );
+    metadata = JSON.parse(row.metadata_json);
+  }
+  if (
+    !metadata &&
+    (input.githubIntegrationEnabled ||
+      input.github_integration_enabled ||
+      input.github)
+  )
+    throw new ApiError(
+      422,
+      "Importe o repositório para vincular uma integração.",
+    );
+  const name = String(input.name ?? metadata?.name ?? "").trim(),
+    description = String(
+      input.description ?? metadata?.description ?? "",
+    ).trim();
   if (name.length < 2 || name.length > 100)
     throw new ApiError(422, "Informe um nome entre 2 e 100 caracteres.");
-  if (description.length < 10 || description.length > 500)
-    throw new ApiError(422, "A descrição deve ter entre 10 e 500 caracteres.");
-  const sizeBytes = Number(input.sizeBytes ?? 0);
+  if (description.length > 500)
+    throw new ApiError(422, "A descrição deve ter até 500 caracteres.");
+  const languages = normalizeLanguages(
+    input.languages ?? metadata?.languages ?? {},
+  );
+  const sizeBytes = Number(metadata?.sizeBytes ?? input.sizeBytes ?? 0);
   if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 0)
-    throw new ApiError(422, "Tamanho do projeto inválido.");
-  const rawLanguages =
-    input.languages && typeof input.languages === "object"
-      ? input.languages
-      : {};
-  const languages = Object.fromEntries(
-    Object.entries(rawLanguages)
-      .filter(
-        ([key, value]) =>
-          typeof key === "string" &&
-          Number.isFinite(Number(value)) &&
-          Number(value) > 0,
-      )
-      .slice(0, 8),
-  );
-  if (!Object.keys(languages).length)
-    throw new ApiError(422, "Informe ao menos uma linguagem e seu percentual.");
-  const validUrl = (value) => !value || /^https?:\/\//i.test(value);
-  if (!validUrl(input.githubUrl) || !validUrl(input.demoUrl))
-    throw new ApiError(422, "Use URLs http(s) válidas.");
+    throw new ApiError(422, "Tamanho inválido.");
+  const repositoryUrl = validProjectUrl(
+      metadata?.repositoryUrl ?? input.repositoryUrl ?? input.githubUrl ?? "",
+    ),
+    demoUrl = validProjectUrl(input.demoUrl ?? "");
   let id = slug(name);
-  if (!id) throw new ApiError(422, "Nome de projeto inválido.");
-  if (db.prepare("SELECT 1 FROM projects WHERE id = ?").get(id))
-    id = `${id}-${randomUUID().slice(0, 6)}`;
-  const now = isoNow();
-  db.prepare(
-    "INSERT INTO projects (id, owner_id, name, description, languages_json, github_url, demo_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-  ).run(
-    id,
-    user.id,
-    name,
-    description,
-    JSON.stringify(languages),
-    String(input.githubUrl ?? ""),
-    String(input.demoUrl ?? ""),
-    now,
-    now,
-  );
-  db.prepare("UPDATE projects SET size_bytes=? WHERE id=?").run(sizeBytes, id);
-  db.prepare(
-    "INSERT INTO commits (id, project_id, message, author_name, committed_at) VALUES (?, ?, ?, ?, ?)",
-  ).run(randomUUID(), id, "Projeto publicado no Orbitfolio", user.name, now);
-  return db.prepare("SELECT * FROM projects WHERE id = ?").get(id);
+  if (!id) throw new ApiError(422, "Nome inválido.");
+  if (db.prepare("SELECT 1 FROM projects WHERE id=?").get(id))
+    id += `-${randomUUID().slice(0, 8)}`;
+  const gh = metadata?.github,
+    now = isoNow();
+  db.exec("BEGIN");
+  try {
+    db.prepare(
+      `INSERT INTO projects(id,owner_id,name,description,description_text,languages_json,github_url,demo_url,size_bytes,repository_url,github_repository_id,github_repository_owner,github_repository_name,github_repository_full_name,github_default_branch,github_integration_enabled,github_private,language_bytes_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    ).run(
+      id,
+      user.id,
+      name,
+      description.length >= 10 ? description : "Sem descrição.",
+      description,
+      JSON.stringify(languages),
+      gh?.url ||
+        (repositoryUrl.startsWith("https://github.com/") ? repositoryUrl : ""),
+      demoUrl,
+      sizeBytes,
+      repositoryUrl,
+      gh?.id ?? null,
+      gh?.owner ?? null,
+      gh?.name ?? null,
+      gh?.fullName ?? null,
+      gh?.defaultBranch ?? null,
+      gh?.integrationEnabled ? 1 : 0,
+      gh?.private ? 1 : 0,
+      JSON.stringify(metadata?.languageBytes ?? {}),
+      now,
+      now,
+    );
+    ensureOrbits(db);
+    if (input.importId)
+      db.prepare("DELETE FROM project_imports WHERE id=?").run(input.importId);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+  return db.prepare("SELECT * FROM projects WHERE id=?").get(id);
 }
 export function setRelation(db, table, fields, values, active) {
   const where = fields.map((field) => `${field} = ?`).join(" AND ");
@@ -279,7 +339,7 @@ export function rankingProjects(db, viewerId, period) {
       `SELECT projects.*, COUNT(project_likes.user_id) AS period_likes FROM projects LEFT JOIN project_likes ON project_likes.project_id = projects.id ${clause} GROUP BY projects.id ORDER BY period_likes DESC, projects.views DESC, projects.updated_at DESC`,
     )
     .all(...params);
-  return rows.map((row) => publicProject(db, row, viewerId));
+  return rows.map((row) => publicProject(db, row, viewerId)).filter(Boolean);
 }
 
 export const SOCIAL_CATEGORIES = [
