@@ -1,3 +1,4 @@
+import { githubRepositoryUrl } from "../shared/project-links.js";
 import {
   normalizeLanguages,
   validProjectUrl,
@@ -273,6 +274,8 @@ export function createProject(db, user, input) {
       metadata?.repositoryUrl ?? input.repositoryUrl ?? input.githubUrl ?? "",
     ),
     demoUrl = validProjectUrl(input.demoUrl ?? "");
+  if (input.githubUrl && !githubRepositoryUrl(input.githubUrl)) throw new ApiError(422, "Informe o link principal de um repositório GitHub.");
+  if (!repositoryUrl && !demoUrl) throw new ApiError(422, "Adicione um link do GitHub ou um link externo para criar o projeto.");
   let id = slug(name);
   if (!id) throw new ApiError(422, "Nome inválido.");
   if (db.prepare("SELECT 1 FROM projects WHERE id=?").get(id))
@@ -291,7 +294,7 @@ export function createProject(db, user, input) {
       description,
       JSON.stringify(languages),
       gh?.url ||
-        (repositoryUrl.startsWith("https://github.com/") ? repositoryUrl : ""),
+        githubRepositoryUrl(repositoryUrl),
       demoUrl,
       sizeBytes,
       repositoryUrl,

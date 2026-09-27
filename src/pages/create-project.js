@@ -1,3 +1,5 @@
+import { chooseLanguage } from "../components/language-picker.js";
+import { projectLinks } from "../../shared/project-links.js";
 import { api } from "../api/index.js";
 import { shell } from "../components/shell.js";
 import { navigate } from "../router/router.js";
@@ -128,18 +130,26 @@ export async function renderCreateProject(root) {
       });
   }
   function editor() {
+    const links = projectLinks(draft);
     frame(
-      `<h2>${draft.importId ? "Revise seu projeto" : "Personalizar projeto"}</h2>${draft.github?.private ? '<p class="notice">Repositório privado: este projeto não será exibido publicamente. Os commits exigem acesso GitHub autorizado.</p>' : ""}<form class="profile-form project-form" data-project-form><label>Nome do projeto<input name="name" required minlength="2" maxlength="100" value="${e(draft.name)}"></label><label>Descrição<textarea name="description" maxlength="500">${e(draft.description)}</textarea></label><label>Link do projeto<input name="repositoryUrl" type="url" value="${e(draft.repositoryUrl || "")}" ${draft.importId ? "readonly" : ""}></label><fieldset><legend>Linguagens</legend><p>Porcentagens são opcionais. Quando todas forem preenchidas, devem somar 100%.</p><table class="language-table"><thead><tr><th>Linguagem</th><th>% (opcional)</th><th>Ações</th></tr></thead><tbody data-language-rows></tbody></table><button type="button" class="button" data-add-language>+ Adicionar linguagem</button></fieldset><div class="actions"><button class="button button-primary" type="submit">Criar projeto</button><button class="button" type="button" data-back>Voltar</button></div></form>`,
+      `<h2>${draft.importId ? "Revise seu projeto" : "Personalizar projeto"}</h2>${draft.github?.private ? '<p class="notice">Repositório privado: este projeto não será exibido publicamente. Os commits exigem acesso GitHub autorizado.</p>' : ""}<form class="profile-form project-form" data-project-form><label>Nome do projeto<input name="name" required minlength="2" maxlength="100" value="${e(draft.name)}"></label><label>Descrição<textarea name="description" maxlength="500">${e(draft.description)}</textarea></label><label>Repositório GitHub<input name="githubUrl" type="url" value="${e(links.github)}" ${draft.importId ? "readonly" : ""} placeholder="https://github.com/usuario/repositorio"></label><label>Link externo do projeto<input name="demoUrl" type="url" value="${e(links.external)}" placeholder="https://meu-projeto.com"></label><p>Adicione pelo menos um dos links.</p><fieldset><legend>Linguagens</legend><p>Porcentagens são opcionais. Quando todas forem preenchidas, devem somar 100%.</p><table class="language-table"><thead><tr><th>Linguagem</th><th>% (opcional)</th><th>Ações</th></tr></thead><tbody data-language-rows></tbody></table><button type="button" class="button" data-add-language>+ Adicionar linguagem</button></fieldset><div class="actions"><button class="button button-primary" type="submit">Criar projeto</button><button class="button" type="button" data-back>Voltar</button></div></form>`,
     );
     const rows = root.querySelector("[data-language-rows]");
     const add = (name = "", value = null) => {
       const row = document.createElement("tr");
-      row.innerHTML = `<td><input aria-label="Linguagem" maxlength="50" required value="${e(name)}"></td><td><input aria-label="Porcentagem" type="number" min="0" max="100" step="any" value="${value == null ? "" : Number(value)}"></td><td><button class="button" type="button" aria-label="Remover linguagem">Remover</button></td>`;
+      row.innerHTML = `<td><input aria-label="Linguagem" readonly maxlength="50" required value="${e(name)}"></td><td><input aria-label="Porcentagem" type="number" min="0" max="100" step="any" value="${value == null ? "" : Number(value)}"></td><td><button class="button" type="button" aria-label="Remover linguagem">Remover</button></td>`;
       row.querySelector("button").onclick = () => row.remove();
       rows.append(row);
     };
     for (const entry of Object.entries(draft.languages || {})) add(...entry);
-    root.querySelector("[data-add-language]").onclick = () => add();
+    root.querySelector("[data-add-language]").onclick = async () => {
+      const name = await chooseLanguage(
+        [...rows.querySelectorAll('[aria-label="Linguagem"]')].map(
+          (input) => input.value,
+        ),
+      );
+      if (name && rows.isConnected) add(name);
+    };
     root.querySelector("[data-back]").onclick = () => {
       draft = { name: "", description: "", repositoryUrl: "", languages: {} };
       choice();
@@ -159,6 +169,12 @@ export async function renderCreateProject(root) {
         entries.length
       )
         return error(new Error("Não repita linguagens."));
+      if (!values.githubUrl.trim() && !values.demoUrl.trim())
+        return error(
+          new Error(
+            "Adicione um link do GitHub ou um link externo para criar o projeto.",
+          ),
+        );
       busy(event.submitter, "Criando planeta...", async () => {
         const project = await api.projects.create({
           ...values,

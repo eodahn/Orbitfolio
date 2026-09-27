@@ -1,3 +1,4 @@
+import { projectLinks } from "../../shared/project-links.js";
 import { escapeHtml as e } from "../utils/html.js";
 import { api } from "../api/index.js";
 import { shell, toast } from "../components/shell.js";
@@ -33,16 +34,17 @@ export async function mountProject(
     container.innerHTML = "<h2>Projeto não encontrado.</h2>";
     return;
   }
+  const links = projectLinks(project);
   const own = project.owner.id === viewer?.id;
   container.classList.toggle("project-view", !home);
-  container.innerHTML = `${home ? "" : `<section class="project-orbit">${previewMarkup(project, true)}</section>`}<section class="project-info"><p class="eyebrow">${e(project.owner.name)}${project.github?.private ? " · PRIVADO" : ""}</p><h1>${e(project.name)}</h1><p class="lead">${e(project.description || "Sem descrição.")}</p><div class="stat-row"><span>♡ ${project.likes}</span><span>◉ ${project.views}</span><span>★ ${project.rating}</span></div><h2>Linguagens</h2><div class="language-bars">${
+  container.innerHTML = `${home ? "" : `<section class="project-orbit">${previewMarkup(project, true)}</section>`}<section class="project-info"><p class="eyebrow"><a data-route class="project-author" href="/user/${encodeURIComponent(project.owner.id)}">${e(project.owner.name)}</a>${project.github?.private ? " · PRIVADO" : ""}</p><h1>${e(project.name)}</h1><p class="lead">${e(project.description || "Sem descrição.")}</p><div class="stat-row"><span>♡ ${project.likes}</span><span>◉ ${project.views}</span><span>★ ${project.rating}</span></div><h2>Linguagens</h2><div class="language-bars">${
     Object.entries(project.languages || {})
       .map(
         ([name, value]) =>
           `<div><span>${e(name)}</span><i style="width:${value == null ? 0 : Number(value)}%"></i><b>${value == null ? "—" : Number(value).toFixed(1) + "%"}</b></div>`,
       )
       .join("") || "<p>Linguagens não informadas.</p>"
-  }</div><div class="actions">${project.repositoryUrl || project.demoUrl ? `<a class="button button-primary" href="${e(project.demoUrl || project.repositoryUrl)}" target="_blank" rel="noreferrer">Acessar projeto</a>` : ""}${project.githubUrl ? `<a class="button" href="${e(project.githubUrl)}" target="_blank" rel="noreferrer">Acessar GitHub</a>` : ""}<button class="button" data-like>${project.liked ? "Descurtir" : "Curtir"}</button><button class="button" data-favorite>${project.favorited ? "Remover favorito" : "Favoritar planeta"}</button>${own ? '<button class="button button-danger" data-delete>Excluir projeto</button>' : ""}</div><section class="info-block"><h2>Atividade</h2>${project.github?.integrationEnabled ? '<button class="button" data-commits>Ver commits do GitHub</button><div data-timeline></div>' : "<p>Este projeto não possui integração GitHub. Nenhum histórico de commits será simulado.</p>"}</section></section>`;
+  }</div><div class="actions">${links.primary ? `<a class="button button-primary" href="${e(links.primary)}" target="_blank" rel="noreferrer">Acessar projeto</a>` : ""}${links.github && links.external ? `<a class="button" href="${e(links.github)}" target="_blank" rel="noreferrer">Acessar GitHub</a>` : ""}<button class="button" data-like>${project.liked ? "Descurtir" : "Curtir"}</button><button class="button" data-favorite>${project.favorited ? "Remover favorito" : "Favoritar planeta"}</button>${own ? '<button class="button button-danger" data-delete>Excluir projeto</button>' : ""}</div><section class="info-block"><h2>Atividade</h2>${project.github?.integrationEnabled ? '<button class="button" data-commits>Ver commits do GitHub</button><div data-timeline></div>' : "<p>Este projeto não possui integração GitHub. Nenhum histórico de commits será simulado.</p>"}</section></section>`;
   for (const [selector, active, on, off] of [
     ["[data-like]", project.liked, api.social.like, api.social.unlike],
     [

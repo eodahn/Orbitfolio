@@ -75,16 +75,25 @@ export async function githubRequest(path, { token, fetcher = fetch } = {}) {
     throw new ApiError(422, "Caminho GitHub inválido.");
   let response;
   try {
-    response = await fetcher(API + path, {
-      headers: {
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "User-Agent": "Orbitfolio",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      redirect: "error",
-      signal: AbortSignal.timeout(12000),
-    });
+    let target = new URL(API + path);
+    for (let redirects = 0; redirects < 4; redirects++) {
+      response = await fetcher(target.href, {
+        headers: {
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+          "User-Agent": "Orbitfolio",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        redirect: "manual",
+        signal: AbortSignal.timeout(12000),
+      });
+      if (![301, 302, 307, 308].includes(response.status)) break;
+      const location = response.headers.get("location");
+      if (!location || redirects === 3) throw Error("Invalid redirect");
+      target = new URL(location, target);
+      if (target.origin !== API || target.username || target.password)
+        throw Error("Unsafe redirect");
+    }
   } catch {
     throw new ApiError(
       503,
@@ -92,11 +101,13 @@ export async function githubRequest(path, { token, fetcher = fetch } = {}) {
     );
   }
   if (!response.ok) {
+    const failure = await response.json().catch(() => ({}));
     if (
       response.status === 429 ||
       (response.status === 403 &&
         (response.headers.get("x-ratelimit-remaining") === "0" ||
-          response.headers.has("retry-after")))
+          response.headers.has("retry-after") ||
+          /rate limit|abuse detection/i.test(failure.message || "")))
     )
       throw new ApiError(
         429,
@@ -107,10 +118,19 @@ export async function githubRequest(path, { token, fetcher = fetch } = {}) {
         401,
         "Integração GitHub expirada. Reconecte sua conta.",
       );
-    if ([403, 404].includes(response.status))
+    if (response.status === 404)
+      throw new ApiError(
+        404,
+        token
+          ? "Repositório não encontrado ou não autorizado para a conta GitHub conectada. Verifique o endereço e as permissões da organização."
+          : "Repositório público não encontrado. Verifique o endereço ou conecte o GitHub para acessar repositórios privados.",
+      );
+    if (response.status === 403)
       throw new ApiError(
         403,
-        "Repositório não encontrado ou sem permissão no GitHub.",
+        response.headers.has("x-github-sso")
+          ? "Autorize o acesso SSO da sua organização no GitHub e tente novamente."
+          : "O GitHub negou acesso. Verifique as permissões do aplicativo OAuth na organização ou reconecte sua conta GitHub.",
       );
     if (response.status === 409) return { data: [], hasNext: false };
     throw new ApiError(
@@ -356,6 +376,11 @@ export function createGithubService(
     },
     async inspect(user, input) {
       requireUser(user);
+      if (typeof input.integrated !== "boolean")
+        throw new ApiError(
+          422,
+          "Informe se a importação usa integração GitHub.",
+        );
       const integrated = input.integrated === true,
         { path } = repositoryPath(input.url || input.fullName),
         token = integrated ? tokenFor(user) : undefined;
@@ -365,7 +390,10 @@ export function createGithubService(
           403,
           "Este repositório exige integração autenticada.",
         );
-      const { data: languages } = await request(path + "/languages", token);
+      const { data: languages } = await request(
+        repositoryPath(repo.full_name).path + "/languages",
+        token,
+      );
       return saveImport(db, user, mapRepository(repo, languages, integrated));
     },
     async authorize(user, project) {

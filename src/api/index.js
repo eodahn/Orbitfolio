@@ -25,6 +25,7 @@ async function request(path, options = {}) {
 }
 export const api = {
   capabilities,
+  search: (query) => request(`/api/search?q=${encodeURIComponent(query)}`),
   projects: {
     mine: async () => (await request("/api/projects/mine")).projects,
     delete: (id) =>

@@ -12,7 +12,7 @@ export function shell(content, active = "") {
     )
     .join(
       "",
-    )}</nav><a data-route class="account-orb" href="/account" aria-label="Abrir conta">◒</a></header><a data-route class="social-moon" href="/social" aria-label="Abrir Lua Social">☾ <span>Lua Social</span></a>${active !== "/" ? '<button class="panel-close" data-close aria-label="Fechar">×</button>' : ""}${content}<a data-route class="featured-fab" href="/featured" aria-label="Abrir Planetas em destaque">▤<span>Em destaque</span></a><div id="toast-region" class="toast-region" aria-live="polite"></div></div>`;
+    )}</nav><a data-route class="search-nav" href="/search" aria-label="Pesquisar contas e planetas"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg></a><a data-route class="account-orb" href="/account" aria-label="Abrir conta">◒</a></header><a data-route class="social-moon" href="/social" aria-label="Abrir Lua Social">☾ <span>Lua Social</span></a>${active !== "/" ? '<button class="panel-close" data-close aria-label="Fechar">×</button>' : ""}${content}<a data-route class="featured-fab" href="/featured" aria-label="Abrir Planetas em destaque">▤<span>Em destaque</span></a><div id="toast-region" class="toast-region" aria-live="polite"></div></div>`;
 }
 export function toast(message, type = "info") {
   const region = document.getElementById("toast-region");

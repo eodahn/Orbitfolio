@@ -1,3 +1,4 @@
+import { searchAll } from "./server/search.js";
 import { createGithubService } from "./server/github.js";
 import { ensureOrbits, deleteProject } from "./server/project-data.js";
 import http from "node:http";
@@ -142,6 +143,7 @@ const server = http.createServer(async (req, res) => {
           .map((p) => publicProject(db, p, user.id)),
       });
     }
+    if (path === "/api/search" && req.method === "GET") return reply(res, 200, searchAll(db, url.searchParams.get("q"), user?.id));
     if (path === "/api/health" && req.method === "GET")
       return reply(res, 200, { ok: true });
     if (path === "/api/auth/session" && req.method === "GET")

@@ -44,7 +44,7 @@ test("mutual follows, privacy for every category, owner access, editing and byte
   follows(b, a);
   follows(c, a);
   const project = createProject(db, a, {
-    name: "Planeta teste",
+    name: "Planeta teste", demoUrl: "https://example.com/project",
     description: "Projeto para os testes sociais",
     languages: { JavaScript: 100 },
     sizeBytes: 2147483648,

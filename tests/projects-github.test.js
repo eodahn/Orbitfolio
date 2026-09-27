@@ -60,7 +60,7 @@ test("manual projects persist optional percentages and stable positions; delete 
     const a = account(db, "Alice"),
       b = account(db, "Bruno");
     const p = createProject(db, a, {
-      name: "Manual test",
+      name: "Manual test", demoUrl: "https://example.com/project",
       languages: { JavaScript: null, CSS: 30 },
       description: "",
     });
@@ -90,7 +90,7 @@ test("manual projects persist optional percentages and stable positions; delete 
       ).orbit,
       view.orbit,
     );
-    createProject(db, a, { name: "Another planet", languages: {} });
+    createProject(db, a, { name: "Another planet", demoUrl: "https://example.com/project", languages: {} });
     ensureOrbits(db);
     assert.deepEqual(
       publicProject(
@@ -273,7 +273,7 @@ test("private repository access uses viewer token, prevents public leaks, and re
   assert.equal(commits.hasNext, true);
   await assert.rejects(
     () => service.commits(b, p),
-    (e) => e.status === 403,
+    (e) => e.status === 404,
   );
   assert.equal(calls.at(-1), "Bearer Bruno");
   await assert.rejects(
@@ -285,7 +285,10 @@ test("private repository access uses viewer token, prevents public leaks, and re
 test("GitHub errors are sanitized and rate-limit distinguished", async () => {
   for (const [status, headers, expected] of [
     [401, {}, 401],
-    [404, {}, 403],
+    [403, {}, 403],
+    [403, { "x-github-sso": "required" }, 403],
+    [429, {}, 429],
+    [404, {}, 404],
     [403, { "x-ratelimit-remaining": "0" }, 429],
     [500, {}, 502],
   ])
@@ -315,4 +318,13 @@ test("camera framing contains small and large spheres in portrait and landscape"
       assert.ok(angle < (58 * Math.PI) / 360);
       assert.ok(angle < Math.atan(Math.tan((58 * Math.PI) / 360) * aspect));
     }
+});
+
+test("repository redirects retain authorization only on GitHub API", async()=>{
+ const calls=[];
+ const result=await githubRequest('/repos/old/name',{token:'fixture',fetcher:async(url,options)=>{calls.push([url,options.headers.Authorization]);return calls.length===1?response({},301,{location:'https://api.github.com/repos/new/name'}):response({id:1});}});
+ assert.equal(result.data.id,1);assert.equal(calls[1][1],'Bearer fixture');
+ let count=0;
+ await assert.rejects(()=>githubRequest('/repos/a/b',{token:'fixture',fetcher:async()=>{count++;return response({},301,{location:'https://example.com/steal'});}}),e=>e.status===503);
+ assert.equal(count,1);
 });

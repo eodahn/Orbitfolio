@@ -1,3 +1,4 @@
+import { renderSearch } from "./pages/search.js";
 import { renderCreateProject } from "./pages/create-project.js";
 import { startPlanetPreviews } from "./three/preview.js";
 import "./styles/main.css";
@@ -39,6 +40,7 @@ registerRoute("/favorites", route(renderFavorites));
 registerRoute("/featured", route(renderFeatured));
 registerRoute("/account", route(renderAccount));
 registerRoute("/social", route(renderSocial));
+registerRoute("/search", route(renderSearch));
 registerRoute(
   "/login",
   route((r) => renderLogin(r)),

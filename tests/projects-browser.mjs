@@ -63,6 +63,7 @@ try {
   const foreign = (
     await api(other, "/api/projects", "POST", {
       name: "Projeto de outro",
+      demoUrl: "https://example.com/project",
       languages: { Python: null },
     })
   ).project;
@@ -97,22 +98,39 @@ try {
   await page.getByLabel("Nome do projeto").fill("Meu planeta manual");
   await page.getByLabel("Descrição", { exact: true }).fill("");
   await page
-    .getByLabel("Link do projeto")
+    .getByRole("button", { name: "Criar projeto", exact: true })
+    .click();
+  await page
+    .getByText(
+      "Adicione um link do GitHub ou um link externo para criar o projeto.",
+      { exact: true },
+    )
+    .waitFor();
+  await page
+    .getByLabel("Link externo do projeto")
     .fill("https://example.com/my-project");
   await page
     .getByRole("button", { name: "+ Adicionar linguagem", exact: true })
     .click();
-  await page
-    .getByRole("textbox", { name: "Linguagem", exact: true })
-    .nth(0)
-    .fill("JavaScript");
+  assert.equal(
+    await page.locator(".language-options button").first().innerText(),
+    "Outra",
+  );
+  await page.getByLabel("Pesquisar linguagem").fill("JavaS");
+  assert.equal(await page.locator(".language-options button").count(), 2);
+  await page.getByRole("button", { name: "JavaScript", exact: true }).click();
   await page
     .getByRole("button", { name: "+ Adicionar linguagem", exact: true })
     .click();
-  await page
-    .getByRole("textbox", { name: "Linguagem", exact: true })
-    .nth(1)
-    .fill("CSS");
+  assert.equal(
+    await page
+      .getByRole("button", { name: "JavaScript · adicionada", exact: true })
+      .isDisabled(),
+    true,
+  );
+  await page.getByRole("button", { name: "Outra", exact: true }).click();
+  await page.getByLabel("Nome da linguagem").fill("CSS");
+  await page.getByRole("button", { name: "Adicionar", exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(
     await page.evaluate(
@@ -136,6 +154,77 @@ try {
   const id = page.url().split("/").pop(),
     saved = (await api(owner, "/api/projects/" + id)).project;
   assert.deepEqual(saved.languages, { JavaScript: null, CSS: null });
+  assert.equal(
+    await page
+      .getByRole("link", { name: "Acessar projeto", exact: true })
+      .getAttribute("href"),
+    "https://example.com/my-project",
+  );
+  assert.equal(
+    await page
+      .getByRole("link", { name: "Acessar GitHub", exact: true })
+      .count(),
+    0,
+  );
+  await page
+    .getByRole("link", { name: "Dono do Planeta", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "Dono do Planeta", exact: true })
+    .waitFor();
+  await page.goBack();
+  await page
+    .getByRole("heading", { name: "Meu planeta manual", exact: true })
+    .waitFor();
+  await page.getByRole("link", { name: "Pesquisar contas e planetas" }).click();
+  await page
+    .getByLabel("Contas e planetas", { exact: true })
+    .fill("MEU PLANETA");
+  await page.getByRole("button", { name: "Pesquisar", exact: true }).click();
+  await page
+    .getByRole("heading", { name: "Meu planeta manual", exact: true })
+    .waitFor();
+  await page
+    .getByLabel("Contas e planetas", { exact: true })
+    .fill("Outro Viajante");
+  await page.getByRole("button", { name: "Pesquisar", exact: true }).click();
+  await page
+    .getByRole("link", { name: "Visualizar conta", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "Outro Viajante", exact: true })
+    .waitFor();
+  await page.goto(base + "/project/" + id);
+  for (const [suffix, demoUrl] of [
+    ["GitHub", ""],
+    ["Both", "https://example.com/deploy"],
+  ]) {
+    const created = (
+      await api(owner, "/api/projects", "POST", {
+        name: "Links " + suffix,
+        githubUrl: "https://github.com/owner/repo",
+        demoUrl,
+      })
+    ).project;
+    await page.goto(base + "/project/" + created.id);
+    await page
+      .getByRole("heading", { name: "Links " + suffix, exact: true })
+      .waitFor();
+    assert.equal(
+      await page
+        .getByRole("link", { name: "Acessar projeto", exact: true })
+        .getAttribute("href"),
+      demoUrl || "https://github.com/owner/repo",
+    );
+    assert.equal(
+      await page
+        .getByRole("link", { name: "Acessar GitHub", exact: true })
+        .count(),
+      demoUrl ? 1 : 0,
+    );
+    await api(owner, "/api/projects/" + created.id, "DELETE");
+  }
+  await page.goto(base + "/project/" + id);
   const orbit = saved.orbit;
   await page.reload();
   await page.getByRole("heading", { name: "Meu planeta manual" }).waitFor();

@@ -139,3 +139,23 @@ Limites: sem refresh automático de tokens OAuth revogados (reconexão explícit
 Arquivos novos: migration 003; `server/github.js`, `server/project-data.js`, `shared/world-config.js`; `src/pages/create-project.js`, `src/components/dialog.js`, `src/components/commit-timeline.js`, `src/three/preview.js`; `.env.example`; `tests/projects-github.test.js`, `tests/projects-browser.mjs`.
 
 Arquivos ajustados: servidor/API e serializadores, migrations runner, páginas de projetos/Home, fábrica/universo/configuração 3D, cards, estilos, scripts de teste, teste de universo, `.gitignore`, README e este documento. Todas as alterações permanecem em `feature/frontend-rebuild`.
+
+## Busca, links e diagnóstico GitHub — 27/09/2026
+
+A navegação agora inclui `/search?q=...`, com contas por nome/username e projetos por nome, descrição e linguagens. A busca ignora caixa e acentos, prioriza correspondências exatas e filtra projetos privados antes de classificar resultados. O proprietário pode encontrar seus próprios projetos privados. Não existe alteração na privacidade das listas sociais.
+
+O formulário separa repositório GitHub e endereço externo (`demo_url`, coluna existente); exige pelo menos um link http(s), sem credenciais. `githubUrl` exige o endereço principal de um repositório. O botão principal prefere o endereço externo; com ambos os links há um botão GitHub separado. Projetos antigos continuam legíveis sem migração. O autor é um link para o perfil no componente compartilhado pela página e pelo painel da Home.
+
+O seletor de linguagens usa diálogo estilizado, filtro, navegação por teclado e “Outra” na primeira posição. Nomes personalizados ficam no projeto; não se adicionam ao catálogo. Duplicatas sem distinção de caixa e o nome literal “Outra” são recusados no servidor.
+
+### Diagnóstico do 403
+
+Falha reproduzida no código anterior: `githubRequest` convertia toda resposta upstream 404 em 403, tornando impossível distinguir recurso indisponível de acesso negado. Agora preserva 404 com orientação para endereço/permissão, distingue 401 (reconectar), 403 (permissões de OAuth/organização/SSO) e 429 (limites primários/secundários). Não devolve mensagens brutas, tokens nem corpos do GitHub ao cliente. Redirecionamentos de repositórios renomeados são limitados e só seguem para `https://api.github.com`, preservando a autenticação sem enviá-la a terceiros. Linguagens são consultadas pelo nome canônico retornado pelo GitHub. `integrated` deve ser booleano explícito para evitar importação anônima acidental.
+
+O fluxo integrado continua usando o token criptografado da conta atual, OAuth com state vinculado à sessão e PKCE, e escopos `read:user repo`. A criação revalida o acesso ao repositório vinculado. Estar autenticado no Orbitfolio não equivale a estar conectado ao GitHub. A configuração exige APP_ORIGIN, client ID, client secret e chave de criptografia; a URL de callback deve coincidir com a aplicação OAuth. Restrições de organização precisam ser autorizadas no GitHub.
+
+Não foi possível atribuir a ocorrência concreta no site a uma causa específica: não foram fornecidos resposta original, logs da instalação ou credenciais OAuth para consentimento real. Os testes usam respostas controladas do GitHub e verificam estado, criptografia, autorização por usuário, repositório privado, erros e redirecionamentos. Não representam validação de consentimento real com repositório privado em produção.
+
+Validação: 13 testes unitários; build Vite; suítes de navegador social, universo e projetos. Incluem listas Seguidores/Seguindo/Amigos → Visualizar conta, Curtidos, Favoritos, cinco categorias “Somente eu” ainda acessíveis ao dono; busca e navegação pelo autor; criação sem link recusada, somente externo, somente GitHub, ambos; linguagens padrão e personalizada; regressões de física, persistência e exclusão. Build mantém aviso de tamanho do bundle Three.js. Nenhuma migração nova ou destrutiva.
+
+Arquivos principais: `server/github.js`, `server/search.js`, `server/app.js`, `server.mjs`, `shared/project-links.js`, `src/pages/search.js`, `src/pages/create-project.js`, `src/pages/project.js`, `src/components/language-picker.js` e navegação/API/estilos correspondentes.

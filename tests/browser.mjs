@@ -61,7 +61,7 @@ try {
   await api(b, `/api/users/${alice.id}/follow`, "POST");
   const project = (
     await api(a, "/api/projects", "POST", {
-      name: "Planeta E2E",
+      name: "Planeta E2E", demoUrl: "https://example.com/project",
       description: "Projeto criado durante a validação",
       languages: { JavaScript: 100 },
       sizeBytes: 100000000,

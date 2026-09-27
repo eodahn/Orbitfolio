@@ -14,7 +14,7 @@ export function normalizeLanguages(input = {}) {
   const result = entries.map(([raw, value]) => {
     const name = raw.trim(),
       key = name.toLowerCase();
-    if (!name || name.length > 50 || seen.has(key))
+    if (!name || name.length > 50 || key === "outra" || seen.has(key))
       throw new ApiError(
         422,
         "Informe linguagens únicas com até 50 caracteres.",
