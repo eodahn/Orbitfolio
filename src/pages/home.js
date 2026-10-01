@@ -2,7 +2,7 @@ import { mountProject } from "./project.js";
 import { shell, toast } from "../components/shell.js";
 import { api } from "../api/index.js";
 import { Universe } from "../three/universe.js";
-import { navigate } from "../router/router.js";
+import { navigate, goHome } from "../router/router.js";
 let universe, homeNode;
 function closeHomeProject(immediate = false) {
   homeNode?.querySelector("[data-home-panel]")?.remove();
@@ -22,7 +22,10 @@ async function openHomeProject(project) {
   panel.innerHTML =
     '<button class="button home-project-close" data-home-close aria-label="Fechar projeto">×</button><div data-home-details><p role="status">Carregando projeto...</p></div>';
   homeNode.append(panel);
-  panel.querySelector("button").onclick = () => closeHomeProject();
+  panel.querySelector("button").onclick = () => {
+    closeHomeProject(true);
+    goHome();
+  };
   panel.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeHomeProject();
   });

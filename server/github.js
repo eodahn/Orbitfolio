@@ -9,7 +9,15 @@ import { saveImport } from "./project-data.js";
 const API = "https://api.github.com";
 const sha = (value) => createHash("sha256").update(value).digest("hex");
 export function githubConfig(env = process.env) {
-  const origin = env.APP_ORIGIN || "";
+  const origin = (
+    env.APP_ORIGIN ||
+    (env.NODE_ENV === "production"
+      ? "https://orbitfolio.onrender.com"
+      : env.RENDER_EXTERNAL_URL) ||
+    ""
+  )
+    .trim()
+    .replace(/\/+$/, "");
   let valid = false;
   try {
     const u = new URL(origin);
@@ -17,19 +25,31 @@ export function githubConfig(env = process.env) {
       (u.protocol === "https:" ||
         (["localhost", "127.0.0.1"].includes(u.hostname) &&
           u.protocol === "http:")) &&
-      u.origin === origin;
+      u.origin === origin &&
+      (env.NODE_ENV !== "production" ||
+        origin === "https://orbitfolio.onrender.com");
   } catch {}
-  const key = env.GITHUB_TOKEN_ENCRYPTION_KEY || "";
+  const callbackUrl = (
+    env.GITHUB_CALLBACK_URL || `${origin}/api/github/callback`
+  ).trim();
+  const callbackValid = callbackUrl === `${origin}/api/github/callback`;
+  const key = (env.GITHUB_TOKEN_ENCRYPTION_KEY || "").trim();
+  const clientId = (env.GITHUB_CLIENT_ID || "").trim();
+  const secret = (env.GITHUB_CLIENT_SECRET || "").trim();
+  const configurationIssues = [];
+  if (!valid) configurationIssues.push("APP_ORIGIN");
+  if (!callbackValid) configurationIssues.push("GITHUB_CALLBACK_URL");
+  if (!clientId) configurationIssues.push("GITHUB_CLIENT_ID");
+  if (!secret) configurationIssues.push("GITHUB_CLIENT_SECRET");
+  if (!/^[a-fA-F0-9]{64}$/.test(key))
+    configurationIssues.push("GITHUB_TOKEN_ENCRYPTION_KEY");
   return {
-    enabled: !!(
-      valid &&
-      env.GITHUB_CLIENT_ID &&
-      env.GITHUB_CLIENT_SECRET &&
-      /^[a-fA-F0-9]{64}$/.test(key)
-    ),
+    enabled: configurationIssues.length === 0,
+    configurationIssues,
+    callbackUrl,
     origin,
-    clientId: env.GITHUB_CLIENT_ID,
-    secret: env.GITHUB_CLIENT_SECRET,
+    clientId,
+    secret,
     key,
   };
 }
@@ -241,12 +261,30 @@ export function createGithubService(
     status(user) {
       requireUser(user);
       const row = db
-        .prepare("SELECT github_login FROM github_connections WHERE user_id=?")
+        .prepare("SELECT * FROM github_connections WHERE user_id=?")
         .get(user.id);
+      let connected = config.enabled && !!row;
+      if (connected) {
+        try {
+          decryptToken(row.encrypted_token, user.id, config);
+        } catch {
+          connected = false;
+        }
+      }
       return {
         available: config.enabled,
-        connected: config.enabled && !!row,
-        login: config.enabled ? row?.github_login : null,
+        configurationIssues: config.configurationIssues,
+        connected,
+        login: connected ? row?.github_login : null,
+        account: connected
+          ? {
+              id: row.github_user_id,
+              login: row.github_login,
+              name: row.github_name,
+              avatarUrl: row.github_avatar_url,
+              profileUrl: row.github_profile_url,
+            }
+          : null,
       };
     },
     connect(user, cookies) {
@@ -272,7 +310,7 @@ export function createGithubService(
       );
       const params = new URLSearchParams({
         client_id: config.clientId,
-        redirect_uri: config.origin + "/api/github/callback",
+        redirect_uri: config.callbackUrl,
         scope: "read:user repo",
         state,
         code_challenge: createHash("sha256")
@@ -284,7 +322,8 @@ export function createGithubService(
     },
     async callback(user, cookies, query) {
       requireUser(user);
-      if (!config.enabled) throw new ApiError(503, "Integração indisponível.");
+      if (!config.enabled)
+        throw new ApiError(503, "Integração indisponível.", "not_configured");
       const state = String(query.get("state") || ""),
         row = db
           .prepare("SELECT * FROM github_oauth_states WHERE state_hash=?")
@@ -298,12 +337,19 @@ export function createGithubService(
         throw new ApiError(
           403,
           "Autorização inválida ou expirada. Tente conectar novamente.",
+          "invalid_state",
         );
       db.prepare("DELETE FROM github_oauth_states WHERE state_hash=?").run(
         sha(state),
       );
-      if (query.get("error") || !query.get("code"))
-        throw new ApiError(403, "Autorização GitHub cancelada.");
+      if (query.get("error"))
+        throw new ApiError(403, "Autorização GitHub cancelada.", "cancelled");
+      if (!query.get("code"))
+        throw new ApiError(
+          401,
+          "Código de autorização ausente.",
+          "invalid_code",
+        );
       let response;
       try {
         response = await fetcher(
@@ -318,7 +364,7 @@ export function createGithubService(
               client_id: config.clientId,
               client_secret: config.secret,
               code: query.get("code"),
-              redirect_uri: config.origin + "/api/github/callback",
+              redirect_uri: config.callbackUrl,
               code_verifier: decryptToken(
                 row.encrypted_verifier,
                 user.id,
@@ -335,13 +381,26 @@ export function createGithubService(
           "Não foi possível concluir a conexão com GitHub.",
         );
       }
-      const payload = await response.json();
-      if (!response.ok || !payload.access_token)
+      if (response.status === 429)
+        throw new ApiError(
+          429,
+          "Limite de consultas ao GitHub atingido.",
+          "rate_limit",
+        );
+      if (response.status >= 500)
+        throw new ApiError(503, "GitHub indisponível.", "unavailable");
+      const payload = await response.json().catch(() => null);
+      if (!payload)
+        throw new ApiError(502, "Resposta inválida do GitHub.", "unavailable");
+      if (!response.ok || !payload?.access_token)
         throw new ApiError(
           401,
           "Autorização GitHub expirada. Tente novamente.",
+          "invalid_code",
         );
       const { data: identity } = await request("/user", payload.access_token);
+      if (!identity?.id || !identity?.login)
+        throw new ApiError(502, "Identidade GitHub inválida.", "unavailable");
       db.prepare(
         "INSERT INTO github_connections(user_id,github_user_id,github_login,encrypted_token) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET github_user_id=excluded.github_user_id,github_login=excluded.github_login,encrypted_token=excluded.encrypted_token,updated_at=CURRENT_TIMESTAMP",
       ).run(
@@ -349,6 +408,14 @@ export function createGithubService(
         identity.id,
         identity.login,
         encryptToken(payload.access_token, user.id, config),
+      );
+      db.prepare(
+        "UPDATE github_connections SET github_name=?,github_avatar_url=?,github_profile_url=? WHERE user_id=?",
+      ).run(
+        identity.name || identity.login,
+        identity.avatar_url || "",
+        identity.html_url || "",
+        user.id,
       );
     },
     disconnect(user) {

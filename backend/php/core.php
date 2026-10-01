@@ -3,14 +3,17 @@ declare(strict_types=1);
 require_once __DIR__ . "/db.php";
 class ApiError extends RuntimeException
 {
-    public function __construct(public int $status, string $message)
-    {
+    public function __construct(
+        public int $status,
+        string $message,
+        public ?string $reason = null,
+    ) {
         parent::__construct($message);
     }
 }
-function fail(int $status, string $message): never
+function fail(int $status, string $message, ?string $reason = null): never
 {
-    throw new ApiError($status, $message);
+    throw new ApiError($status, $message, $reason);
 }
 function reply(mixed $value, int $status = 200): never
 {

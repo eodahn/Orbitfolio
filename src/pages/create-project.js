@@ -1,3 +1,4 @@
+import { oauthMessages } from "../../shared/oauth-errors.js";
 import { chooseLanguage } from "../components/language-picker.js";
 import {
   projectLinks,
@@ -79,18 +80,18 @@ export async function renderCreateProject(root) {
     status = await api.github.status();
     if (!status.available) {
       frame(
-        '<h2>Integração GitHub indisponível</h2><p>A conexão com GitHub ainda não foi configurada neste servidor. Você pode adicionar um link público ou personalizar seu projeto.</p><button class="button" data-manual>Continuar sem integração</button>',
+        `<h2>Integração GitHub indisponível</h2><p>${status.configurationIssues?.some((key) => key === "APP_ORIGIN" || key === "GITHUB_CALLBACK_URL") ? "O endereço de retorno da autorização precisa ser corrigido pelo administrador." : status.configurationIssues?.includes("GITHUB_TOKEN_ENCRYPTION_KEY") ? "O administrador precisa configurar as credenciais do aplicativo e o armazenamento seguro da conexão GitHub." : "O administrador precisa configurar as credenciais do aplicativo GitHub."} Você pode continuar sem integração.</p><button class="button" data-manual>Continuar sem integração</button>`,
       );
       root.querySelector("[data-manual]").onclick = link;
       return;
     }
     if (!status.connected) {
       frame(
-        `<h2>Conectar sua conta GitHub</h2><p>Você será encaminhado ao GitHub para autorizar o acesso aos repositórios. O escopo OAuth “repo” também inclui permissões de escrita, embora o Orbitfolio só consulte os dados.</p><div class="actions"><button class="button button-primary" data-connect>Autorizar no GitHub</button><button class="button" data-manual>Continuar sem integração</button></div>`,
+        `<h2>Conectar sua conta GitHub</h2><p>Você será encaminhado ao GitHub para autorizar o acesso aos repositórios. O escopo OAuth “repo” também inclui permissões de escrita, embora o Orbitfolio só consulte os dados.</p><div class="actions"><button class="button button-primary" data-connect>Conectar com GitHub</button><button class="button" data-manual>Continuar sem integração</button></div>`,
       );
       root.querySelector("[data-connect]").onclick = (event) =>
         busy(event.target, "Abrindo GitHub...", async () => {
-          location.assign((await api.github.connect()).url);
+          location.assign("/api/github/auth");
         });
       root.querySelector("[data-manual]").onclick = link;
       return;
@@ -107,7 +108,7 @@ export async function renderCreateProject(root) {
         busy(event.target, "Carregando...", github);
       root.querySelector("[data-reconnect]").onclick = (event) =>
         busy(event.target, "Abrindo GitHub...", async () =>
-          location.assign((await api.github.connect()).url),
+          location.assign("/api/github/auth"),
         );
       root.querySelector("[data-manual]").onclick = link;
       return;
@@ -208,7 +209,8 @@ export async function renderCreateProject(root) {
   if (callback === "error")
     error(
       new Error(
-        "A conexão foi cancelada ou expirou. Tente integrar novamente.",
+        oauthMessages[new URLSearchParams(location.search).get("reason")] ||
+          oauthMessages.error,
       ),
     );
 }

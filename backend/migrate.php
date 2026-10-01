@@ -117,3 +117,5 @@ lockWrite(function () {
         }
     }
 });
+
+require __DIR__ . "/database/002_github_identity.php";

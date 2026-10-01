@@ -1,3 +1,4 @@
+import { goHome } from "../router/router.js";
 import { escapeHtml as e } from "../utils/html.js";
 export const LANGUAGES = Object.freeze([
   "Python",
@@ -90,7 +91,10 @@ export function chooseLanguage(existing = []) {
       event.preventDefault();
       accept(custom.elements.language.value);
     };
-    dialog.querySelector("[data-dismiss]").onclick = () => dialog.close();
+    dialog.querySelector("[data-dismiss]").onclick = () => {
+      dialog.close();
+      goHome();
+    };
     dialog.addEventListener(
       "close",
       () => {

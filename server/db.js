@@ -1,5 +1,6 @@
+import { prepareDatabasePath } from "./storage.js";
 import { DatabaseSync } from "node:sqlite";
-import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,12 +8,7 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const migrationsDir = join(root, "database", "migrations");
 
 export function openDatabase(filename) {
-  mkdirSync(join(root, "data"), { recursive: true });
-  const db = new DatabaseSync(
-    filename ??
-      process.env.ORBITFOLIO_DATABASE_PATH ??
-      join(root, "data", "orbitfolio.sqlite"),
-  );
+  const db = new DatabaseSync(prepareDatabasePath(filename));
   db.exec(
     "PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);",
   );

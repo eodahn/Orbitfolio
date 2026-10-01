@@ -1,3 +1,5 @@
+import { oauthErrorCode } from "./shared/oauth-errors.js";
+import { storageWarnings } from "./server/storage.js";
 import { searchAll } from "./server/search.js";
 import { createGithubService } from "./server/github.js";
 import { ensureOrbits, deleteProject } from "./server/project-data.js";
@@ -30,8 +32,10 @@ import {
 } from "./server/social.js";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
+for (const warning of storageWarnings()) console.warn(warning);
 const db = openDatabase();
-if (process.env.SEED_DEMO === "true") seedDevelopmentData(db);
+if (process.env.SEED_DEMO === "true" && process.env.NODE_ENV !== "production")
+  seedDevelopmentData(db);
 ensureOrbits(db);
 const github = createGithubService(db);
 const types = {
@@ -76,7 +80,9 @@ function csrf(req) {
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://orbitfolio.onrender.com",
-    process.env.APP_ORIGIN,
+    (process.env.APP_ORIGIN || process.env.RENDER_EXTERNAL_URL || "")
+      .trim()
+      .replace(/\/+$/, ""),
   ]);
   if (origin && !allowed.has(origin))
     throw new ApiError(403, "Origem inválida.");
@@ -96,6 +102,17 @@ const server = http.createServer(async (req, res) => {
     };
     if (path === "/api/github/status" && req.method === "GET")
       return reply(res, 200, github.status(requireUser(user)));
+    if (path === "/api/github/auth" && req.method === "GET") {
+      if (req.headers["sec-fetch-site"] === "cross-site")
+        throw new ApiError(403, "Inicie a conexão pelo Orbitfolio.");
+      const target = github.connect(requireUser(user), req.headers.cookie);
+      res.writeHead(303, {
+        Location: target.url,
+        "Cache-Control": "no-store",
+        "Referrer-Policy": "no-referrer",
+      });
+      return res.end();
+    }
     if (path === "/api/github/connect" && req.method === "POST")
       return reply(
         res,
@@ -107,14 +124,16 @@ const server = http.createServer(async (req, res) => {
       return reply(res, 204);
     }
     if (path === "/api/github/callback" && req.method === "GET") {
-      let result = "connected";
+      let result = "connected",
+        reason = "";
       try {
         await github.callback(user, req.headers.cookie, url.searchParams);
-      } catch {
+      } catch (error) {
         result = "error";
+        reason = "&reason=" + oauthErrorCode(error);
       }
       res.writeHead(303, {
-        Location: "/projects/new?github=" + result,
+        Location: "/projects/new?github=" + result + reason,
         "Cache-Control": "no-store",
         "Referrer-Policy": "no-referrer",
       });
@@ -143,9 +162,14 @@ const server = http.createServer(async (req, res) => {
           .map((p) => publicProject(db, p, user.id)),
       });
     }
-    if (path === "/api/search" && req.method === "GET") return reply(res, 200, searchAll(db, url.searchParams.get("q"), user?.id));
+    if (path === "/api/search" && req.method === "GET")
+      return reply(
+        res,
+        200,
+        searchAll(db, url.searchParams.get("q"), user?.id),
+      );
     if (path === "/api/health" && req.method === "GET")
-      return reply(res, 200, { ok: true });
+      return reply(res, 200, { ok: true, backend: "node-sqlite" });
     if (path === "/api/auth/session" && req.method === "GET")
       return reply(res, 200, { user: publicUser(db, user, user?.id) });
     if (path === "/api/auth/register" && req.method === "POST") {

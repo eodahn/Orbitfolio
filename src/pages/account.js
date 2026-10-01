@@ -131,18 +131,29 @@ export async function renderProfile(root, id) {
 export function renderLogin(root, register = false) {
   const label = register ? "Criar conta" : "Entrar";
   root.innerHTML = shell(
-    `<main class="page narrow auth-page"><p class="eyebrow">${register ? "NOVA ÓRBITA" : "BOAS-VINDAS"}</p><h1>${label}</h1><form class="auth-card" data-auth>${register ? `<label>Nome<input required name="name" autocomplete="name"></label>` : ""}<label>E-mail<input required type="email" name="email" autocomplete="email"></label><label>Senha<input required minlength="8" type="password" name="password" autocomplete="${register ? "new-password" : "current-password"}"></label><button class="button button-primary">${label}</button></form><p class="auth-switch">${register ? "Já possui uma conta?" : "Ainda não possui conta?"} <a data-route href="${register ? "/login" : "/register"}">${register ? "Entrar" : "Criar conta"}</a></p></main>`,
+    `<main class="page narrow auth-page"><p class="eyebrow">${register ? "NOVA ÓRBITA" : "BOAS-VINDAS"}</p><h1>${label}</h1><form class="auth-card" data-auth>${register ? `<label>Nome<input required name="name" autocomplete="name"></label>` : ""}<label>E-mail<input required type="email" name="email" autocomplete="email"></label><label>Senha<input required minlength="8" type="password" name="password" autocomplete="${register ? "new-password" : "current-password"}"></label><button class="button button-primary">${label}</button><p data-auth-error class="form-error" role="alert"></p></form><p class="auth-switch">${register ? "Já possui uma conta?" : "Ainda não possui conta?"} <a data-route href="${register ? "/login" : "/register"}">${register ? "Entrar" : "Criar conta"}</a></p></main>`,
   );
   root
     .querySelector("[data-auth]")
     .addEventListener("submit", async (event) => {
       event.preventDefault();
-      const data = Object.fromEntries(new FormData(event.currentTarget));
+      const form = event.currentTarget;
+      const button = form.querySelector("button");
+      if (button.disabled) return;
+      const errorBox = form.querySelector("[data-auth-error]");
+      errorBox.textContent = "";
+      button.disabled = true;
+      const data = Object.fromEntries(new FormData(form));
       try {
         await (register ? api.auth.register : api.auth.login)(data);
-        navigate("/account");
+        await navigate("/account");
       } catch (error) {
-        toast(error.message, "error");
+        errorBox.textContent =
+          error.status === 401
+            ? "E-mail ou senha inválidos. Use os dados cadastrados no Orbitfolio."
+            : error.message;
+      } finally {
+        if (button.isConnected) button.disabled = false;
       }
     });
 }

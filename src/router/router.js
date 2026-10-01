@@ -11,6 +11,9 @@ export async function navigate(path, state = {}) {
   );
   await renderCurrent();
 }
+export function goHome() {
+  return navigate("/");
+}
 export async function renderCurrent() {
   try {
     const route =
@@ -32,8 +35,8 @@ export function startRouter() {
   addEventListener("popstate", renderCurrent);
   document.addEventListener("click", (event) => {
     if (event.target.closest("[data-close]")) {
-      if (history.state?.orbitPrevious) history.back();
-      else navigate("/");
+      event.preventDefault();
+      goHome();
       return;
     }
     const link = event.target.closest("a[data-route]");

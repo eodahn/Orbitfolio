@@ -68,3 +68,5 @@ O projeto mantém npm como caminho validado. O `pnpm-workspace.yaml` histórico 
 O backend PHP/MySQL adaptado está em `backend/`, com Dockerfile para execução Apache e a mesma API JSON do frontend. Consulte [configuração, migração e testes](backend/README.md) antes de mudar o runtime do site. `npm start` permanece Node/SQLite; os dois bancos não são sincronizados automaticamente.
 
 Em “Continuar sem integração”, qualquer URL HTTP(S) de portfólio abre a personalização sem consultar o GitHub. Na busca, “Ir para o planeta” leva à Home e teletransporta a nave para uma posição livre junto ao planeta escolhido.
+
+Para persistência de contas, backup do banco e configuração OAuth no Render, veja [Contas e GitHub](docs/CONTAS-E-GITHUB.md).

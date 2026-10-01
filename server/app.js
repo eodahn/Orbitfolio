@@ -20,7 +20,11 @@ const passwordHash = (value) => {
   return `${salt}:${scryptSync(value, salt, 64).toString("hex")}`;
 };
 const passwordMatches = (value, stored) => {
-  if (!stored) return false;
+  if (
+    typeof stored !== "string" ||
+    !/^[a-f0-9]{32}:[a-f0-9]{128}$/i.test(stored)
+  )
+    return false;
   const [salt, hash] = stored.split(":");
   const actual = scryptSync(value, salt, 64);
   return timingSafeEqual(actual, Buffer.from(hash, "hex"));
@@ -35,9 +39,10 @@ const slug = (value) =>
     .slice(0, 64);
 
 export class ApiError extends Error {
-  constructor(status, message) {
+  constructor(status, message, code) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 export function parseCookies(header = "") {
@@ -274,8 +279,16 @@ export function createProject(db, user, input) {
       metadata?.repositoryUrl ?? input.repositoryUrl ?? input.githubUrl ?? "",
     ),
     demoUrl = validProjectUrl(input.demoUrl ?? "");
-  if (input.githubUrl && !githubRepositoryUrl(input.githubUrl)) throw new ApiError(422, "Informe o link principal de um repositório GitHub.");
-  if (!repositoryUrl && !demoUrl) throw new ApiError(422, "Adicione um link do GitHub ou um link externo para criar o projeto.");
+  if (input.githubUrl && !githubRepositoryUrl(input.githubUrl))
+    throw new ApiError(
+      422,
+      "Informe o link principal de um repositório GitHub.",
+    );
+  if (!repositoryUrl && !demoUrl)
+    throw new ApiError(
+      422,
+      "Adicione um link do GitHub ou um link externo para criar o projeto.",
+    );
   let id = slug(name);
   if (!id) throw new ApiError(422, "Nome inválido.");
   if (db.prepare("SELECT 1 FROM projects WHERE id=?").get(id))
@@ -293,8 +306,7 @@ export function createProject(db, user, input) {
       description.length >= 10 ? description : "Sem descrição.",
       description,
       JSON.stringify(languages),
-      gh?.url ||
-        githubRepositoryUrl(repositoryUrl),
+      gh?.url || githubRepositoryUrl(repositoryUrl),
       demoUrl,
       sizeBytes,
       repositoryUrl,

@@ -6,6 +6,7 @@ import {
 
 // Development-only seed. The browser never imports these records at runtime.
 export function seedDevelopmentData(db) {
+  if (process.env.NODE_ENV === "production") throw new Error("Seeds de desenvolvimento não podem executar em produção.");
   if (db.prepare("SELECT COUNT(*) AS count FROM users").get().count) return;
   const insertUser = db.prepare(
     "INSERT INTO users (id, name, email, bio) VALUES (?, ?, ?, ?)",

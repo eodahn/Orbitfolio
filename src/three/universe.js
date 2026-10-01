@@ -11,9 +11,7 @@ export class Universe {
     this.onFocus = onFocus;
     this.onFirstMovement = onFirstMovement;
     this.hasMoved = false;
-    this.lowPower =
-      matchMedia("(max-width: 700px)").matches ||
-      navigator.hardwareConcurrency <= 4;
+    this.lowPower = navigator.hardwareConcurrency <= 4;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: !this.lowPower,

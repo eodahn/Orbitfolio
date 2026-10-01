@@ -10,7 +10,7 @@ try {
         http_response_code(404);
         exit();
     }
-    $origin = rtrim(getenv("APP_ORIGIN") ?: "", "/");
+    $origin = githubConfig()["origin"];
     if (in_array($method, ["POST", "PATCH", "DELETE", "PUT"], true)) {
         if (($_SERVER["HTTP_SEC_FETCH_SITE"] ?? "") === "cross-site") {
             fail(403, "Origem não permitida.");

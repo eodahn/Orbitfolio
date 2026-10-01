@@ -281,10 +281,7 @@ function api(string $path, string $method): never
     if ($path === "/api/github/status" && $method === "GET") {
         $id = authenticated();
         $c = githubConfig();
-        $r = one(
-            "SELECT login,encrypted_token FROM orbit_github WHERE user_id=?",
-            [$id],
-        );
+        $r = one("SELECT * FROM orbit_github WHERE user_id=?", [$id]);
         $connected = false;
         if ($c["available"] && $r) {
             try {
@@ -295,23 +292,60 @@ function api(string $path, string $method): never
         }
         reply([
             "available" => (bool) $c["available"],
+            "configurationIssues" => $c["configurationIssues"],
             "connected" => $connected,
             "login" => $connected ? $r["login"] : null,
+            "account" => $connected
+                ? [
+                    "id" => $r["github_user_id"],
+                    "login" => $r["login"],
+                    "name" => $r["github_name"],
+                    "avatarUrl" => $r["github_avatar_url"],
+                    "profileUrl" => $r["github_profile_url"],
+                ]
+                : null,
         ]);
+    }
+    if ($path === "/api/github/auth" && $method === "GET") {
+        if (($_SERVER["HTTP_SEC_FETCH_SITE"] ?? "") === "cross-site") {
+            fail(403, "Inicie a conexão pelo Orbitfolio.");
+        }
+        $target = githubConnect();
+        header("Cache-Control: no-store");
+        header("Referrer-Policy: no-referrer");
+        header("Location: " . $target["url"], true, 303);
+        exit();
     }
     if ($path === "/api/github/connect" && $method === "POST") {
         reply(githubConnect());
     }
     if ($path === "/api/github/callback" && $method === "GET") {
         $result = "connected";
+        $reason = "";
         try {
             githubCallback($_GET);
-        } catch (Throwable) {
+        } catch (Throwable $error) {
             $result = "error";
+            $code =
+                $error instanceof ApiError
+                    ? $error->reason ??
+                        match ($error->status) {
+                            401 => "session_required",
+                            403 => "access_denied",
+                            429 => "rate_limit",
+                            502, 503 => "unavailable",
+                            default => "error",
+                        }
+                    : "error";
+            $reason = "&reason=" . rawurlencode($code);
         }
         header("Cache-Control: no-store");
         header("Referrer-Policy: no-referrer");
-        header("Location: /projects/new?github=" . $result, true, 303);
+        header(
+            "Location: /projects/new?github=" . $result . $reason,
+            true,
+            303,
+        );
         exit();
     }
     if ($path === "/api/github/disconnect" && $method === "DELETE") {

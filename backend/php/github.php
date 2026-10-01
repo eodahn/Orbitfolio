@@ -5,28 +5,63 @@ require_once __DIR__ . "/core.php";
 // session-bound PKCE, encrypted credentials, bounded requests and explicit errors.
 function githubConfig(): array
 {
-    $origin = rtrim(getenv("APP_ORIGIN") ?: "", "/");
+    $origin = rtrim(
+        trim(
+            getenv("APP_ORIGIN") ?:
+            (getenv("NODE_ENV") === "production"
+                ? "https://orbitfolio.onrender.com"
+                : getenv("RENDER_EXTERNAL_URL")) ?:
+            "",
+        ),
+        "/",
+    );
     $u = parse_url($origin);
     $valid =
         $u &&
         isset($u["host"]) &&
         !isset($u["user"]) &&
         !isset($u["query"]) &&
+        !isset($u["fragment"]) &&
         empty($u["path"]) &&
         (($u["scheme"] ?? "") === "https" ||
             (($u["scheme"] ?? "") === "http" &&
                 in_array($u["host"], ["localhost", "127.0.0.1"], true)));
-    $key = getenv("GITHUB_TOKEN_ENCRYPTION_KEY") ?: "";
+    if (
+        getenv("NODE_ENV") === "production" &&
+        $origin !== "https://orbitfolio.onrender.com"
+    ) {
+        $valid = false;
+    }
+    $callback = trim(
+        getenv("GITHUB_CALLBACK_URL") ?: $origin . "/api/github/callback",
+    );
+    $key = trim(getenv("GITHUB_TOKEN_ENCRYPTION_KEY") ?: "");
+    $client = trim(getenv("GITHUB_CLIENT_ID") ?: "");
+    $secret = trim(getenv("GITHUB_CLIENT_SECRET") ?: "");
+    $issues = [];
+    if (!$valid) {
+        $issues[] = "APP_ORIGIN";
+    }
+    if ($callback !== $origin . "/api/github/callback") {
+        $issues[] = "GITHUB_CALLBACK_URL";
+    }
+    if (!$client) {
+        $issues[] = "GITHUB_CLIENT_ID";
+    }
+    if (!$secret) {
+        $issues[] = "GITHUB_CLIENT_SECRET";
+    }
+    if (!preg_match('/^[a-f0-9]{64}$/i', $key)) {
+        $issues[] = "GITHUB_TOKEN_ENCRYPTION_KEY";
+    }
     return [
-        "available" =>
-            $valid &&
-            (bool) getenv("GITHUB_CLIENT_ID") &&
-            (bool) getenv("GITHUB_CLIENT_SECRET") &&
-            (bool) preg_match('/^[a-f0-9]{64}$/i', $key),
+        "available" => count($issues) === 0,
+        "configurationIssues" => $issues,
+        "callbackUrl" => $callback,
         "origin" => $origin,
         "key" => $key,
-        "client" => getenv("GITHUB_CLIENT_ID") ?: "",
-        "secret" => getenv("GITHUB_CLIENT_SECRET") ?: "",
+        "client" => $client,
+        "secret" => $secret,
     ];
 }
 function b64(string $v): string
@@ -249,7 +284,7 @@ function githubConnect(): array
             "https://github.com/login/oauth/authorize?" .
             http_build_query([
                 "client_id" => $c["client"],
-                "redirect_uri" => $c["origin"] . "/api/github/callback",
+                "redirect_uri" => $c["callbackUrl"],
                 "scope" => "repo read:user",
                 "state" => $state,
                 "code_challenge" => b64(hash("sha256", $verifier, true)),
@@ -271,25 +306,38 @@ function githubCallback(array $params): void
             hash("sha256", (string) ($params["state"] ?? "")),
         )
     ) {
-        fail(403, "Autorização inválida ou expirada.");
+        fail(403, "Autorização inválida ou expirada.", "invalid_state");
     }
-    if (empty($params["code"]) || isset($params["error"])) {
-        fail(403, "Autorização GitHub cancelada.");
+    if (isset($params["error"])) {
+        fail(403, "Autorização GitHub cancelada.", "cancelled");
+    }
+    if (empty($params["code"])) {
+        fail(401, "Código de autorização ausente.", "invalid_code");
     }
     $c = githubConfig();
     if (!$c["available"]) {
-        fail(503, "Integração GitHub indisponível.");
+        fail(503, "Integração GitHub indisponível.", "not_configured");
     }
     $r = githubHttp("https://github.com/login/oauth/access_token", null, [
         "client_id" => $c["client"],
         "client_secret" => $c["secret"],
         "code" => $params["code"],
-        "redirect_uri" => $c["origin"] . "/api/github/callback",
+        "redirect_uri" => $c["callbackUrl"],
         "code_verifier" => $s["verifier"],
     ]);
+    if ($r["status"] === 429) {
+        fail(429, "Limite de consultas ao GitHub.", "rate_limit");
+    }
+    if ($r["status"] >= 500) {
+        fail(503, "GitHub indisponível.", "unavailable");
+    }
     $token = $r["data"]["access_token"] ?? "";
     if ($r["status"] !== 200 || !is_string($token) || !$token) {
-        fail(401, "Autorização GitHub expirada. Tente novamente.");
+        fail(
+            401,
+            "Autorização GitHub expirada. Tente novamente.",
+            "invalid_code",
+        );
     }
     $identity = githubRequest("/user", $token)["data"];
     if (empty($identity["id"]) || empty($identity["login"])) {
@@ -302,6 +350,15 @@ function githubCallback(array $params): void
             $identity["id"],
             $identity["login"],
             encryptCredential($token, $id),
+        ],
+    );
+    query(
+        "UPDATE orbit_github SET github_name=?,github_avatar_url=?,github_profile_url=? WHERE user_id=?",
+        [
+            $identity["name"] ?? $identity["login"],
+            $identity["avatar_url"] ?? "",
+            $identity["html_url"] ?? "",
+            $id,
         ],
     );
     query(

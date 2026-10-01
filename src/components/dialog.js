@@ -1,3 +1,4 @@
+import { goHome } from "../router/router.js";
 import { escapeHtml as e } from "../utils/html.js";
 export function confirmDelete(name) {
   return new Promise((resolve) => {
@@ -14,6 +15,11 @@ export function confirmDelete(name) {
       },
       { once: true },
     );
+    dialog.querySelector(".dialog-close").onclick = (event) => {
+      event.preventDefault();
+      dialog.close("cancel");
+      goHome();
+    };
     dialog.showModal();
   });
 }

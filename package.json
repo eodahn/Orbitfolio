@@ -17,7 +17,10 @@
     "test:projects": "node tests/projects-browser.mjs",
     "server:php": "php -S 127.0.0.1:3000 backend/router.php",
     "migrate:php": "php backend/migrate.php",
-    "test:php": "php backend/tests/contracts.php"
+    "test:php": "php backend/tests/contracts.php",
+    "check:config": "node scripts/check-config.mjs",
+    "backup:db": "node scripts/backup-database.mjs",
+    "test:login": "npm run build && node tests/login-browser.mjs"
   },
   "dependencies": {
     "three": "^0.160.1"
