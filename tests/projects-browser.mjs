@@ -6,16 +6,22 @@ import { join } from "node:path";
 import { createServer } from "vite";
 import assert from "node:assert/strict";
 const temp = await mkdtemp(join(tmpdir(), "orbit-project-ui-"));
-const server = spawn(process.execPath, ["server.mjs"], {
-  env: {
-    ...process.env,
-    PORT: "3092",
-    APP_ORIGIN: "http://127.0.0.1:5174",
-    SEED_DEMO: "false",
-    ORBITFOLIO_DATABASE_PATH: join(temp, "db.sqlite"),
+const server = spawn(
+  process.env.PHP_BIN || process.execPath,
+  process.env.PHP_BIN
+    ? ["-S", "127.0.0.1:3092", "backend/router.php"]
+    : ["server.mjs"],
+  {
+    env: {
+      ...process.env,
+      PORT: "3092",
+      APP_ORIGIN: "http://127.0.0.1:5174",
+      SEED_DEMO: "false",
+      ORBITFOLIO_DATABASE_PATH: join(temp, "db.sqlite"),
+    },
+    stdio: process.env.TEST_SERVER_LOG ? "inherit" : "ignore",
   },
-  stdio: "ignore",
-});
+);
 const vite = await createServer({
   server: {
     host: "127.0.0.1",
@@ -94,7 +100,26 @@ try {
     .getByRole("heading", { name: "Integração GitHub indisponível" })
     .waitFor();
   await page.getByRole("button", { name: "Continuar sem integração" }).click();
-  await page.getByRole("button", { name: "Personalizar", exact: true }).click();
+  let githubInspections = 0;
+  page.on("request", (request) => {
+    if (request.url().includes("/api/github/repository/inspect"))
+      githubInspections++;
+  });
+  await page
+    .getByLabel("Link do projeto", { exact: true })
+    .fill("https://portfolio.onrender.com");
+  await page
+    .getByRole("button", { name: "Adicionar link", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "Personalizar projeto", exact: true })
+    .waitFor();
+  assert.equal(githubInspections, 0);
+  assert.equal(
+    await page.getByLabel("Link externo do projeto").inputValue(),
+    "https://portfolio.onrender.com/",
+  );
+  await page.getByLabel("Link externo do projeto").fill("");
   await page.getByLabel("Nome do projeto").fill("Meu planeta manual");
   await page.getByLabel("Descrição", { exact: true }).fill("");
   await page
@@ -260,7 +285,18 @@ try {
       return start.call(this);
     };
   });
-  await page.getByRole("link", { name: "Início", exact: true }).click();
+  await page.getByRole("link", { name: "Pesquisar contas e planetas" }).click();
+  await page
+    .getByLabel("Contas e planetas", { exact: true })
+    .fill("Meu planeta manual");
+  await page.getByRole("button", { name: "Pesquisar", exact: true }).click();
+  await page
+    .getByRole("link", {
+      name: "Ir para o planeta Meu planeta manual",
+      exact: true,
+    })
+    .click();
+
   await page.waitForFunction(() => window.world?.running);
   assert.ok(
     await page.evaluate(
@@ -268,6 +304,43 @@ try {
       id,
     ),
   );
+  await page.getByRole("dialog", { name: "Informações do planeta" }).waitFor();
+  const arrived = await page.evaluate((id) => {
+    const u = window.world,
+      p = u.planets.find((p) => p.userData.project.id === id);
+    return {
+      distance: u.ship.position.distanceTo(p.position),
+      radius: p.userData.radius,
+      velocity: u.ship.userData.velocity.length(),
+      safe: u.planets.every(
+        (p) =>
+          u.ship.position.distanceTo(p.position) >
+          p.userData.radius + u.ship.userData.radius,
+      ),
+    };
+  }, id);
+  assert.ok(arrived.safe && arrived.distance < arrived.radius + 65);
+  assert.equal(arrived.velocity, 0);
+  await page
+    .getByRole("button", { name: "Fechar projeto", exact: true })
+    .click();
+  await page.waitForFunction(() => !window.world.focus);
+  await page.getByRole("link", { name: "Pesquisar contas e planetas" }).click();
+  await page
+    .getByLabel("Contas e planetas", { exact: true })
+    .fill("Meu planeta manual");
+  await page.getByRole("button", { name: "Pesquisar", exact: true }).click();
+  await page
+    .getByRole("link", {
+      name: "Ir para o planeta Meu planeta manual",
+      exact: true,
+    })
+    .click();
+  await page.getByRole("dialog", { name: "Informações do planeta" }).waitFor();
+  await page
+    .getByRole("button", { name: "Fechar projeto", exact: true })
+    .click();
+  await page.waitForFunction(() => !window.world.focus);
   // Focus through the same callback used by a raycast click; controls must pause.
   const previous = await page.evaluate((id) => {
     const u = window.world;

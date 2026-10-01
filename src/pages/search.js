@@ -25,7 +25,7 @@ export async function renderSearch(root) {
   try {
     const data = await api.search(query);
     if (!results.isConnected) return;
-    results.innerHTML = `<section><h2>Contas</h2>${data.users.length ? `<div class="project-grid">${data.users.map(userCard).join("")}</div>` : "<p>Nenhuma conta encontrada.</p>"}</section><section><h2>Planetas/Projetos</h2>${data.projects.length ? `<div class="project-grid">${data.projects.map((p) => projectCard(p)).join("")}</div>` : "<p>Nenhum planeta encontrado.</p>"}</section>`;
+    results.innerHTML = `<section><h2>Contas</h2>${data.users.length ? `<div class="project-grid">${data.users.map(userCard).join("")}</div>` : "<p>Nenhuma conta encontrada.</p>"}</section><section><h2>Planetas/Projetos</h2>${data.projects.length ? `<div class="project-grid">${data.projects.map((p) => `<article>${projectCard(p)}<a class="button" data-route href="/?planet=${encodeURIComponent(p.id)}" aria-label="Ir para o planeta ${e(p.name)}">Ir para o planeta</a></article>`).join("")}</div>` : "<p>Nenhum planeta encontrado.</p>"}</section>`;
   } catch (error) {
     if (results.isConnected) {
       results.innerHTML = `<p role="alert">${e(error.message)}</p><button class="button" data-retry>Tentar novamente</button>`;

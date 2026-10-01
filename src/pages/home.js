@@ -1,5 +1,5 @@
 import { mountProject } from "./project.js";
-import { shell } from "../components/shell.js";
+import { shell, toast } from "../components/shell.js";
 import { api } from "../api/index.js";
 import { Universe } from "../three/universe.js";
 import { navigate } from "../router/router.js";
@@ -37,11 +37,24 @@ async function openHomeProject(project) {
 addEventListener("orbitfolio:project-deleted", (event) =>
   universe?.removeProject(event.detail),
 );
+async function requestedPlanet() {
+  const id = new URLSearchParams(location.search).get("planet");
+  if (!id) return;
+  // Consume once: normal back/forward navigation must preserve subsequent flight.
+  history.replaceState(history.state, "", "/");
+  if (!universe.teleportToPlanet(id)) {
+    toast("Planeta indisponível ou sem espaço seguro para chegar.", "error");
+    return;
+  }
+  const planet = universe.planets.find((p) => p.userData.project.id === id);
+  await openHomeProject(planet.userData.project);
+}
 export async function renderHome(root) {
   if (homeNode) {
     root.replaceChildren(homeNode);
     universe.setProjects(await api.projects.list());
     universe.start();
+    await requestedPlanet();
     return;
   }
   const hasSeenFlightHint =
@@ -63,6 +76,7 @@ export async function renderHome(root) {
   );
   universe.setProjects(await api.projects.list());
   universe.start();
+  await requestedPlanet();
 }
 export function pauseUniverse() {
   closeHomeProject(true);

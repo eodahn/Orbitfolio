@@ -62,3 +62,9 @@ npm run test:projects
 - `assets/`: versão histórica, preservada; não é a aplicação Vite atual.
 
 O projeto mantém npm como caminho validado. O `pnpm-workspace.yaml` histórico tem valores inválidos de configuração de builds e não foi usado nesta validação.
+
+## Backend tcc/back1 e navegação para planetas
+
+O backend PHP/MySQL adaptado está em `backend/`, com Dockerfile para execução Apache e a mesma API JSON do frontend. Consulte [configuração, migração e testes](backend/README.md) antes de mudar o runtime do site. `npm start` permanece Node/SQLite; os dois bancos não são sincronizados automaticamente.
+
+Em “Continuar sem integração”, qualquer URL HTTP(S) de portfólio abre a personalização sem consultar o GitHub. Na busca, “Ir para o planeta” leva à Home e teletransporta a nave para uma posição livre junto ao planeta escolhido.

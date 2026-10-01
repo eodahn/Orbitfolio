@@ -5,14 +5,20 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 const temporary = await mkdtemp(join(tmpdir(), "orbitfolio-e2e-"));
-const server = spawn(process.execPath, ["server.mjs"], {
-  env: {
-    ...process.env,
-    PORT: "3091",
-    ORBITFOLIO_DATABASE_PATH: join(temporary, "test.sqlite"),
+const server = spawn(
+  process.env.PHP_BIN || process.execPath,
+  process.env.PHP_BIN
+    ? ["-S", "127.0.0.1:3091", "backend/router.php"]
+    : ["server.mjs"],
+  {
+    env: {
+      ...process.env,
+      PORT: "3091",
+      ORBITFOLIO_DATABASE_PATH: join(temporary, "test.sqlite"),
+    },
+    stdio: process.env.TEST_SERVER_LOG ? "inherit" : "ignore",
   },
-  stdio: "ignore",
-});
+);
 const base = "http://127.0.0.1:3091";
 let browser;
 try {
@@ -40,7 +46,13 @@ try {
       response.ok(),
       `${method} ${path}: ${response.status()} ${await response.text()}`,
     );
-    return response.status() === 204 ? {} : response.json();
+    if (response.status() === 204) return {};
+    const body = await response.text();
+    try {
+      return JSON.parse(body);
+    } catch {
+      throw new Error(`Invalid API JSON: ${body}`);
+    }
   }
   const stamp = Date.now();
   const alice = (
@@ -61,7 +73,8 @@ try {
   await api(b, `/api/users/${alice.id}/follow`, "POST");
   const project = (
     await api(a, "/api/projects", "POST", {
-      name: "Planeta E2E", demoUrl: "https://example.com/project",
+      name: "Planeta E2E",
+      demoUrl: "https://example.com/project",
       description: "Projeto criado durante a validação",
       languages: { JavaScript: 100 },
       sizeBytes: 100000000,

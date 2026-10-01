@@ -192,6 +192,67 @@ export class Universe {
     this.renderer.setSize(width, height, false);
     if (this.focus && !this.focus.returning) this.focusTarget();
   }
+  teleportToPlanet(id) {
+    const planet = this.planets.find((p) => p.userData.project.id === id);
+    if (!planet) return false;
+    const clearance =
+      planet.userData.radius * 1.025 + WORLD.shipRadius + WORLD.margin;
+    // Search rings around the current planet position, including camera clearance.
+    let target;
+    for (const extra of [0, 12, 24, 40]) {
+      for (let i = 0; i < 64; i++) {
+        const angle = (i * Math.PI * 2) / 64;
+        const candidate = planet.position
+          .clone()
+          .add(
+            new THREE.Vector3(
+              Math.sin(angle),
+              0,
+              Math.cos(angle),
+            ).multiplyScalar(clearance + extra),
+          );
+        const camera = candidate
+          .clone()
+          .add(
+            candidate
+              .clone()
+              .sub(planet.position)
+              .normalize()
+              .multiplyScalar(12),
+          )
+          .add(new THREE.Vector3(0, 4.3, 0));
+        const valid = (point, radius) =>
+          [point.x, point.y, point.z].every(
+            (v) => v >= WORLD.min + radius && v <= WORLD.max - radius,
+          ) &&
+          this.planets.every(
+            (p) =>
+              point.distanceTo(p.position) >
+              p.userData.radius * 1.025 + radius + 2,
+          );
+        if (valid(candidate, WORLD.shipRadius) && valid(camera, 1)) {
+          target = candidate;
+          break;
+        }
+      }
+      if (target) break;
+    }
+    if (!target) return false;
+    this.restoreFocus(true);
+    this.keys.clear();
+    this.ship.position.copy(target);
+    this.ship.userData.velocity.set(0, 0, 0);
+    const direction = planet.position.clone().sub(target);
+    this.ship.rotation.set(0, Math.atan2(-direction.x, -direction.z), 0);
+    this.camera.position
+      .copy(target)
+      .add(new THREE.Vector3(0, 4.3, 12).applyQuaternion(this.ship.quaternion));
+    this.camera.lookAt(planet.position);
+    this.hasMoved = true;
+    this.onFirstMovement();
+    this.canvas.focus();
+    return true;
+  }
   focusTarget() {
     const f = this.focus;
     if (!f) return;

@@ -1,5 +1,9 @@
 import { chooseLanguage } from "../components/language-picker.js";
-import { projectLinks } from "../../shared/project-links.js";
+import {
+  projectLinks,
+  safeHttpUrl,
+  githubRepositoryUrl,
+} from "../../shared/project-links.js";
 import { api } from "../api/index.js";
 import { shell } from "../components/shell.js";
 import { navigate } from "../router/router.js";
@@ -44,11 +48,19 @@ export async function renderCreateProject(root) {
   }
   function link() {
     frame(
-      `<h2>Adicione o link do projeto</h2><p>Links de repositórios públicos do GitHub permitem importar nome, descrição e linguagens sem conectar sua conta. Para outros links, personalize os dados.</p><form data-link class="profile-form"><label>Link do projeto<input name="url" type="url" value="${e(draft.repositoryUrl)}" placeholder="https://github.com/usuario/projeto" required></label><div class="actions"><button class="button button-primary">Adicionar link</button><button type="button" class="button" data-custom>Personalizar</button><button type="button" class="button" data-back>Voltar</button></div></form>`,
+      `<h2>Adicione o link do projeto</h2><p>Links de repositórios públicos do GitHub permitem importar nome, descrição e linguagens sem conectar sua conta. Links de portfólios, Render, Hostinger, GitHub Pages e outras hospedagens abrem a personalização, sem exigir conta GitHub.</p><form data-link class="profile-form"><label>Link do projeto<input name="url" type="url" value="${e(draft.repositoryUrl)}" placeholder="https://github.com/usuario/projeto" required></label><div class="actions"><button class="button button-primary">Adicionar link</button><button type="button" class="button" data-custom>Personalizar</button><button type="button" class="button" data-back>Voltar</button></div></form>`,
     );
     root.querySelector("[data-link]").onsubmit = (event) => {
       event.preventDefault();
       draft.repositoryUrl = new FormData(event.currentTarget).get("url");
+      const url = safeHttpUrl(draft.repositoryUrl);
+      if (!url) return error(new Error("Informe um link http(s) válido."));
+      if (!githubRepositoryUrl(url)) {
+        draft.demoUrl = url;
+        draft.repositoryUrl = "";
+        editor();
+        return;
+      }
       busy(event.submitter, "Lendo informações do repositório...", async () => {
         draft = await api.github.inspect({
           url: draft.repositoryUrl,
