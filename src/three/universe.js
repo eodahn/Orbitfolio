@@ -6,6 +6,7 @@ import { framingDistance } from "./preview.js";
 import { createPlanet, disposePlanet } from "./planet-factory.js";
 import { WORLD, availablePosition, randomPosition } from "./world.js";
 import { stepPhysics } from "./physics.js";
+import { Warp, NORMAL_SPEED, WARP_SPEED_MULTIPLIER } from "./warp.js";
 import { createShip } from "./ship.js";
 
 export class Universe {
@@ -35,6 +36,11 @@ export class Universe {
     this.planets = [];
     this.running = false;
     this.ship = createShip();
+    this.warp = new Warp();
+    this.warpHud = document.createElement("aside");
+    this.warpHud.className = "warp-hud";
+    this.warpHud.innerHTML = `<span>DOBRA</span><div class="warp-track" role="progressbar" aria-label="Energia de Dobra" aria-valuemin="0" aria-valuemax="100"><i></i></div><output>100%</output>`;
+    canvas.parentElement.append(this.warpHud);
     Object.assign(this.ship.userData, {
       radius: WORLD.shipRadius,
       mass: WORLD.shipMass,
@@ -369,34 +375,45 @@ export class Universe {
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(
       this.ship.quaternion,
     );
+    const active = this.warp.update(this.keys.has("ShiftLeft") || this.keys.has("ShiftRight"), delta);
+    const multiplier = active ? WARP_SPEED_MULTIPLIER : 1;
+    this.ship.userData.updateWarp?.(active, delta);
+    this.updateWarpHud();
     const acceleration =
       (this.keys.has("KeyW") ? 22 : 0) - (this.keys.has("KeyS") ? 15 : 0);
-    this.ship.userData.velocity.addScaledVector(forward, acceleration * delta);
-    if (this.controls.navigation) {
+    this.ship.userData.velocity.addScaledVector(forward, acceleration * multiplier * delta);
+    {
       const right = new THREE.Vector3(1, 0, 0).applyQuaternion(
         this.ship.quaternion,
       );
       this.ship.userData.velocity.addScaledVector(
         right,
         ((this.keys.has("KeyD") ? 1 : 0) - (this.keys.has("KeyA") ? 1 : 0)) *
-          18 *
+          18 * multiplier *
           delta,
       );
-    } else {
-      if (this.keys.has("KeyA")) this.ship.rotation.y += 1.45 * delta;
-      if (this.keys.has("KeyD")) this.ship.rotation.y -= 1.45 * delta;
-      this.controls.yaw = this.ship.rotation.y;
     }
-    if (this.keys.has("Space")) this.ship.userData.velocity.y += 13 * delta;
-    if (this.keys.has("ShiftLeft") || this.keys.has("ShiftRight"))
-      this.ship.userData.velocity.y -= 13 * delta;
+    if (this.keys.has("Space")) this.ship.userData.velocity.y += 13 * multiplier * delta;
+    if (this.keys.has("ControlLeft") || this.keys.has("ControlRight"))
+      this.ship.userData.velocity.y -= 13 * multiplier * delta;
     this.ship.userData.velocity.multiplyScalar(Math.pow(0.985, delta));
-    this.ship.userData.velocity.clampLength(0, 30);
+    this.ship.userData.velocity.clampLength(0, NORMAL_SPEED * multiplier);
+  }
+  updateWarpHud() {
+    const energy = Math.round(this.warp.energy);
+    this.warpHud.querySelector("i").style.height = `${this.warp.energy}%`;
+    this.warpHud.querySelector("output").textContent = `${energy}%`;
+    this.warpHud.querySelector("[role=progressbar]").setAttribute("aria-valuenow", energy);
+    this.warpHud.classList.toggle("is-active", this.warp.active);
+    this.warpHud.classList.toggle("is-empty", this.warp.exhausted);
   }
   frame = () => {
     if (!this.running) return;
     const delta = Math.min(this.clock.getDelta(), 0.05);
     if (this.focus) {
+      this.warp.update(false, delta);
+      this.ship.userData.updateWarp?.(false, delta);
+      this.updateWarpHud();
       this.updateFocus(delta);
       this.renderer.render(this.scene, this.camera);
       this.frameId = requestAnimationFrame(this.frame);
@@ -437,6 +454,9 @@ export class Universe {
     cancelAnimationFrame(this.frameId);
     this.keys.clear();
     this.clock.stop();
+    this.warp.active = false;
+    this.ship.userData.updateWarp?.(false, 1);
+    this.updateWarpHud();
   }
   dispose() {
     this.stop();
@@ -444,6 +464,8 @@ export class Universe {
     removeEventListener("resize", this.resizeListener);
     this.canvas.removeEventListener("click", this.fallbackClick);
     this.hud.remove();
+    this.warpHud.remove();
+    this.ship.userData.dispose?.();
     for (const planet of this.planets) disposePlanet(planet);
     this.renderer.dispose();
   }

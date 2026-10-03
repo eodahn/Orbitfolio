@@ -7,6 +7,8 @@ const movementKeys = new Set([
   "KeyS",
   "KeyD",
   "Space",
+  "ControlLeft",
+  "ControlRight",
   "ShiftLeft",
   "ShiftRight",
 ]);
@@ -61,7 +63,7 @@ export class FlightControls {
       );
     });
     this.listen(host, "keydown", (event) => {
-      if (!canNavigate() || this.blocked()) return;
+      if (!canNavigate() || this.blocked() || isTyping(event.target)) return;
       if (event.code === "Escape") {
         this.release();
         return;
