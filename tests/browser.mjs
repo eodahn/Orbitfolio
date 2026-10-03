@@ -41,7 +41,10 @@ try {
   const a = await browser.newContext(),
     b = await browser.newContext();
   async function api(context, path, method = "GET", data) {
-    const response = await context.request.fetch(base + path, { method, data });
+    const response = await context.request.fetch(base + path, {
+      method,
+      data,
+    });
     assert.ok(
       response.ok(),
       `${method} ${path}: ${response.status()} ${await response.text()}`,
@@ -60,6 +63,11 @@ try {
       name: "Alice Navegante",
       email: `alice${stamp}@test.local`,
       password: "test-password",
+      username: `alice${stamp}@test.local`
+        .split("@")[0]
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, "-")
+        .padEnd(3, "x"),
     })
   ).user;
   const bruno = (
@@ -67,6 +75,11 @@ try {
       name: "Bruno Viajante",
       email: `bruno${stamp}@test.local`,
       password: "test-password",
+      username: `bruno${stamp}@test.local`
+        .split("@")[0]
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, "-")
+        .padEnd(3, "x"),
     })
   ).user;
   await api(a, `/api/users/${bruno.id}/follow`, "POST");
@@ -76,7 +89,9 @@ try {
       name: "Planeta E2E",
       demoUrl: "https://example.com/project",
       description: "Projeto criado durante a validação",
-      languages: { JavaScript: 100 },
+      languages: {
+        JavaScript: 100,
+      },
       sizeBytes: 100000000,
     })
   ).project;
@@ -89,36 +104,86 @@ try {
     if (m.type() === "error") errors.push(m.text());
   });
   await page.goto(base + "/account");
-  await page.getByRole("heading", { name: "Alice Navegante" }).waitFor();
+  await page
+    .getByRole("heading", {
+      name: "Alice Navegante",
+    })
+    .waitFor();
   for (const label of ["Seguidores", "Seguindo", "Amigos"]) {
-    await page.getByRole("link", { name: new RegExp(`^${label} \\(`) }).click();
-    await page.getByRole("heading", { name: label, exact: true }).waitFor();
     await page
-      .getByRole("link", { name: "Visualizar conta", exact: true })
+      .getByRole("link", {
+        name: new RegExp(`^${label} \\(`),
+      })
       .click();
     await page
-      .getByRole("heading", { name: "Bruno Viajante", exact: true })
+      .getByRole("heading", {
+        name: label,
+        exact: true,
+      })
       .waitFor();
-    await page.getByRole("link", { name: "Conta", exact: true }).click();
-    await page.getByRole("heading", { name: "Alice Navegante" }).waitFor();
+    await page
+      .getByRole("link", {
+        name: "Visualizar conta",
+        exact: true,
+      })
+      .click();
+    await page
+      .getByRole("heading", {
+        name: "Bruno Viajante",
+        exact: true,
+      })
+      .waitFor();
+    await page
+      .getByRole("link", {
+        name: "Conta",
+        exact: true,
+      })
+      .click();
+    await page
+      .getByRole("heading", {
+        name: "Alice Navegante",
+      })
+      .waitFor();
   }
   for (const label of ["Curtidos", "Favoritos"]) {
     await page
       .locator(".profile-tabs")
-      .getByRole("link", { name: label, exact: true })
+      .getByRole("link", {
+        name: label,
+        exact: true,
+      })
       .click();
-    await page.getByRole("heading", { name: label, exact: true }).waitFor();
-    await page.getByRole("heading", { name: "Planeta E2E" }).waitFor();
+    await page
+      .getByRole("heading", {
+        name: label,
+        exact: true,
+      })
+      .waitFor();
+    await page
+      .getByRole("heading", {
+        name: "Planeta E2E",
+      })
+      .waitFor();
   }
   await page
     .locator(".profile-tabs")
-    .getByRole("link", { name: "Privacidade" })
+    .getByRole("link", {
+      name: "Privacidade",
+    })
     .click();
   await page.locator("[data-privacy]").waitFor();
   for (const key of ["followers", "following", "friends", "likes", "favorites"])
     await page.locator(`select[name=${key}]`).selectOption("private");
-  await page.getByRole("button", { name: "Salvar privacidade" }).click();
-  await page.getByText("Alterações salvas.", { exact: true }).waitFor();
+  await page
+    .getByRole("button", {
+      name: "Salvar privacidade",
+    })
+    .click();
+  await page
+    .getByText("Alterações salvas.", {
+      exact: true,
+    })
+    .waitFor();
   for (const key of ["followers", "following", "friends", "likes", "favorites"])
     assert.ok(
       Object.values(await api(a, `/api/users/${alice.id}/${key}`))[0].length,
@@ -132,14 +197,25 @@ try {
   ]) {
     await page
       .locator(".profile-tabs")
-      .getByRole("link", { name: new RegExp(`^${label}( \\(|$)`) })
+      .getByRole("link", {
+        name: new RegExp(`^${label}( \\(|$)`),
+      })
       .click();
-    await page.getByRole("heading", { name: label, exact: true }).waitFor();
+    await page
+      .getByRole("heading", {
+        name: label,
+        exact: true,
+      })
+      .waitFor();
     assert.ok(await page.locator("section .project-card").count());
   }
   const visitor = await b.newPage();
   await visitor.goto(base + `/user/${alice.id}`);
-  await visitor.getByRole("heading", { name: "Alice Navegante" }).waitFor();
+  await visitor
+    .getByRole("heading", {
+      name: "Alice Navegante",
+    })
+    .waitFor();
   for (const label of [
     "Seguidores",
     "Seguindo",
@@ -151,41 +227,86 @@ try {
     assert.equal(
       await visitor
         .locator(".profile-tabs")
-        .getByRole("link", { name: new RegExp(`^${label}`) })
+        .getByRole("link", {
+          name: new RegExp(`^${label}`),
+        })
         .count(),
       0,
       label,
     );
   await visitor.goto(base + `/user/${alice.id}?tab=favorites`);
-  await visitor.getByText("Esta seção é privada.", { exact: true }).waitFor();
-  await page.getByRole("link", { name: "Abrir Lua Social" }).click();
-  await page.getByRole("heading", { name: "Encontre viajantes" }).waitFor();
+  await visitor
+    .getByText("Esta seção é privada.", {
+      exact: true,
+    })
+    .waitFor();
   await page
-    .getByRole("textbox", { name: "Buscar viajantes" })
+    .getByRole("link", {
+      name: "Abrir Lua Social",
+    })
+    .click();
+  await page
+    .getByRole("heading", {
+      name: "Encontre viajantes",
+    })
+    .waitFor();
+  await page
+    .getByRole("textbox", {
+      name: "Buscar viajantes",
+    })
     .fill("Bruno Viajante");
   await page.waitForFunction(
     () => document.querySelectorAll("[data-users] article").length === 1,
   );
   await page
-    .getByRole("heading", { name: "Bruno Viajante", exact: true })
+    .getByRole("heading", {
+      name: "Bruno Viajante",
+      exact: true,
+    })
     .waitFor();
   await page
-    .getByRole("link", { name: "Visualizar conta", exact: true })
+    .getByRole("link", {
+      name: "Visualizar conta",
+      exact: true,
+    })
     .click();
   await page
-    .getByRole("heading", { name: "Bruno Viajante", exact: true })
+    .getByRole("heading", {
+      name: "Bruno Viajante",
+      exact: true,
+    })
     .waitFor();
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("link", { name: "Conta", exact: true }).click();
-  await page.getByRole("heading", { name: "Alice Navegante" }).waitFor();
+  await page.setViewportSize({
+    width: 390,
+    height: 844,
+  });
+  await page
+    .getByRole("link", {
+      name: "Conta",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("heading", {
+      name: "Alice Navegante",
+    })
+    .waitFor();
   assert.equal(
     await page.evaluate(
       () => document.documentElement.scrollWidth > innerWidth,
     ),
     false,
   );
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.getByRole("link", { name: "Início", exact: true }).click();
+  await page.setViewportSize({
+    width: 1440,
+    height: 900,
+  });
+  await page
+    .getByRole("link", {
+      name: "Início",
+      exact: true,
+    })
+    .click();
   await page.locator("canvas").waitFor();
   await page.waitForTimeout(800);
   await page.keyboard.down("KeyW");
@@ -194,9 +315,22 @@ try {
   await page.evaluate(
     () => (window.savedCanvas = document.querySelector("canvas")),
   );
-  await page.getByRole("link", { name: "Abrir Planetas em destaque" }).click();
-  await page.getByRole("heading", { name: "Planetas em destaque" }).waitFor();
-  await page.getByRole("button", { name: "Fechar", exact: true }).click();
+  await page
+    .getByRole("link", {
+      name: "Abrir Planetas em destaque",
+    })
+    .click();
+  await page
+    .getByRole("heading", {
+      name: "Planetas em destaque",
+    })
+    .waitFor();
+  await page
+    .getByRole("button", {
+      name: "Fechar",
+      exact: true,
+    })
+    .click();
   await page.locator("canvas").waitFor();
   assert.ok(
     await page.evaluate(
@@ -212,5 +346,8 @@ try {
   await browser?.close();
   server.kill();
   await new Promise((resolve) => server.once("exit", resolve));
-  await rm(temporary, { recursive: true, force: true });
+  await rm(temporary, {
+    recursive: true,
+    force: true,
+  });
 }

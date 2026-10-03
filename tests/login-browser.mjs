@@ -50,49 +50,104 @@ try {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(base + "/register");
-  await page.getByLabel("Nome", { exact: true }).fill("Conta Persistente");
   await page
-    .getByLabel("E-mail", { exact: true })
+    .getByLabel("Nome de exibição", {
+      exact: true,
+    })
+    .fill("Conta Persistente");
+  await page
+    .getByLabel("E-mail", {
+      exact: true,
+    })
     .fill("persistent@test.local");
-  await page.getByLabel("Senha", { exact: true }).fill("test-password");
-  await page.getByRole("button", { name: "Criar conta", exact: true }).click();
+  await page.getByLabel("Username", { exact: true }).fill("conta-persistente");
   await page
-    .getByRole("heading", { name: "Conta Persistente", exact: true })
+    .getByLabel("Senha", {
+      exact: true,
+    })
+    .fill("test-password");
+  await page
+    .getByRole("button", {
+      name: "Criar conta",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("heading", {
+      name: "Conta Persistente",
+      exact: true,
+    })
     .waitFor();
   await stop();
   await start();
   await page.reload();
   await page
-    .getByRole("heading", { name: "Conta Persistente", exact: true })
+    .getByRole("heading", {
+      name: "Conta Persistente",
+      exact: true,
+    })
     .waitFor();
-  await page.getByRole("button", { name: "Sair", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: "Sair",
+      exact: true,
+    })
+    .click();
   await page.goto(base + "/login");
   await page
-    .getByLabel("E-mail", { exact: true })
+    .getByLabel("E-mail", {
+      exact: true,
+    })
     .fill("persistent@test.local");
-  await page.getByLabel("Senha", { exact: true }).fill("wrong-password");
+  await page
+    .getByLabel("Senha", {
+      exact: true,
+    })
+    .fill("wrong-password");
   const invalid = page.waitForResponse((r) =>
     r.url().endsWith("/api/auth/login"),
   );
-  await page.getByRole("button", { name: "Entrar", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: "Entrar",
+      exact: true,
+    })
+    .click();
   assert.equal((await invalid).status(), 401);
   await page
     .getByRole("alert")
-    .filter({ hasText: "Use os dados cadastrados no Orbitfolio" })
+    .filter({
+      hasText: "Use os dados cadastrados no Orbitfolio",
+    })
     .waitFor();
-  await page.getByLabel("Senha", { exact: true }).fill("test-password");
+  await page
+    .getByLabel("Senha", {
+      exact: true,
+    })
+    .fill("test-password");
   const valid = page.waitForResponse((r) =>
     r.url().endsWith("/api/auth/login"),
   );
-  await page.getByRole("button", { name: "Entrar", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: "Entrar",
+      exact: true,
+    })
+    .click();
   assert.equal((await valid).status(), 200);
   await page
-    .getByRole("heading", { name: "Conta Persistente", exact: true })
+    .getByRole("heading", {
+      name: "Conta Persistente",
+      exact: true,
+    })
     .waitFor();
   const session = await page.request.get(base + "/api/auth/session");
   const user = (await session.json()).user;
   const created = await page.request.post(base + "/api/projects", {
-    data: { name: "Planeta de navegação", demoUrl: "https://example.com" },
+    data: {
+      name: "Planeta de navegação",
+      demoUrl: "https://example.com",
+    },
   });
   const project = (await created.json()).project;
   for (const route of [
@@ -107,22 +162,35 @@ try {
   ]) {
     await page.goto(base + "/account");
     await page.goto(base + route);
-    await page.getByRole("button", { name: "Fechar", exact: true }).click();
+    await page
+      .getByRole("button", {
+        name: "Fechar",
+        exact: true,
+      })
+      .click();
     await page.locator("#universe-canvas").waitFor();
     assert.equal(new URL(page.url()).pathname, "/");
   }
   await page.goto(base + "/projects/new");
   await page
-    .getByRole("button", { name: "Integrar com GitHub", exact: true })
+    .getByRole("button", {
+      name: "Integrar com GitHub",
+      exact: true,
+    })
     .click();
   await page
-    .getByRole("button", { name: "Conectar com GitHub", exact: true })
+    .getByRole("button", {
+      name: "Conectar com GitHub",
+      exact: true,
+    })
     .waitFor();
   // Inspect the real redirect without following it: this environment cannot reach
   // GitHub, and Playwright routing only intercepts the first request in a redirect chain.
   let destination;
   await page.route(base + "/api/github/auth", async (route) => {
-    const redirect = await route.fetch({ maxRedirects: 0 });
+    const redirect = await route.fetch({
+      maxRedirects: 0,
+    });
     assert.equal(redirect.status(), 303);
     destination = new URL(redirect.headers().location);
     await route.fulfill({
@@ -132,10 +200,15 @@ try {
     });
   });
   await page
-    .getByRole("button", { name: "Conectar com GitHub", exact: true })
+    .getByRole("button", {
+      name: "Conectar com GitHub",
+      exact: true,
+    })
     .click();
   await page
-    .getByText("OAuth redirect verified by test.", { exact: true })
+    .getByText("OAuth redirect verified by test.", {
+      exact: true,
+    })
     .waitFor();
   assert.equal(destination.hostname, "github.com");
   assert.equal(
@@ -148,15 +221,24 @@ try {
     base +
       "/api/github/callback?error=access_denied&state=" +
       encodeURIComponent(destination.searchParams.get("state")),
-    { maxRedirects: 0 },
+    {
+      maxRedirects: 0,
+    },
   );
   assert.equal(denied.status(), 303);
   assert.match(denied.headers().location, /reason=cancelled/);
   await page.goto(base + denied.headers().location);
-  await page.getByRole("alert").filter({ hasText: "Você cancelou" }).waitFor();
+  await page
+    .getByRole("alert")
+    .filter({
+      hasText: "Você cancelou",
+    })
+    .waitFor();
   const unknown = await page.request.get(
     base + "/api/github/callback?code=bad&state=wrong",
-    { maxRedirects: 0 },
+    {
+      maxRedirects: 0,
+    },
   );
   assert.match(unknown.headers().location, /reason=invalid_state/);
   const status = await (
@@ -167,7 +249,9 @@ try {
   const anon = await browser.newContext();
   assert.equal(
     (
-      await anon.request.get(base + "/api/github/auth", { maxRedirects: 0 })
+      await anon.request.get(base + "/api/github/auth", {
+        maxRedirects: 0,
+      })
     ).status(),
     401,
   );
@@ -179,5 +263,8 @@ try {
 } finally {
   await browser?.close();
   await stop();
-  await rm(directory, { recursive: true, force: true });
+  await rm(directory, {
+    recursive: true,
+    force: true,
+  });
 }

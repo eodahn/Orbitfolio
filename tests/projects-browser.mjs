@@ -27,7 +27,9 @@ const vite = await createServer({
     host: "127.0.0.1",
     port: 5174,
     strictPort: true,
-    proxy: { "/api": "http://127.0.0.1:3092" },
+    proxy: {
+      "/api": "http://127.0.0.1:3092",
+    },
   },
 });
 let browser;
@@ -52,7 +54,10 @@ try {
   const owner = await browser.newContext(),
     other = await browser.newContext();
   async function api(context, path, method = "GET", data) {
-    const r = await context.request.fetch(base + path, { method, data });
+    const r = await context.request.fetch(base + path, {
+      method,
+      data,
+    });
     assert.ok(r.ok(), `${method} ${path} ${r.status()} ${await r.text()}`);
     return r.status() === 204 ? {} : r.json();
   }
@@ -60,17 +65,29 @@ try {
     name: "Dono do Planeta",
     email: "owner@test.local",
     password: "test-password",
+    username: "owner@test.local"
+      .split("@")[0]
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "-")
+      .padEnd(3, "x"),
   });
   await api(other, "/api/auth/register", "POST", {
     name: "Outro Viajante",
     email: "other@test.local",
     password: "test-password",
+    username: "other@test.local"
+      .split("@")[0]
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "-")
+      .padEnd(3, "x"),
   });
   const foreign = (
     await api(other, "/api/projects", "POST", {
       name: "Projeto de outro",
       demoUrl: "https://example.com/project",
-      languages: { Python: null },
+      languages: {
+        Python: null,
+      },
     })
   ).project;
   const page = await owner.newPage(),
@@ -80,13 +97,25 @@ try {
     if (msg.type() === "error") errors.push(msg.text());
   });
   await page.goto(base + "/projects");
-  await page.getByRole("heading", { name: "Projetos", exact: true }).waitFor();
+  await page
+    .getByRole("heading", {
+      name: "Projetos",
+      exact: true,
+    })
+    .waitFor();
   assert.equal(
-    await page.getByRole("heading", { name: foreign.name }).count(),
+    await page
+      .getByRole("heading", {
+        name: foreign.name,
+      })
+      .count(),
     0,
   );
   await page
-    .getByRole("link", { name: "Adicionar projeto", exact: true })
+    .getByRole("link", {
+      name: "Adicionar projeto",
+      exact: true,
+    })
     .click();
   await page
     .getByRole("heading", {
@@ -94,25 +123,42 @@ try {
     })
     .waitFor();
   await page
-    .getByRole("button", { name: "Integrar com GitHub", exact: true })
+    .getByRole("button", {
+      name: "Integrar com GitHub",
+      exact: true,
+    })
     .click();
   await page
-    .getByRole("heading", { name: "Integração GitHub indisponível" })
+    .getByRole("heading", {
+      name: "Integração GitHub indisponível",
+    })
     .waitFor();
-  await page.getByRole("button", { name: "Continuar sem integração" }).click();
+  await page
+    .getByRole("button", {
+      name: "Continuar sem integração",
+    })
+    .click();
   let githubInspections = 0;
   page.on("request", (request) => {
     if (request.url().includes("/api/github/repository/inspect"))
       githubInspections++;
   });
   await page
-    .getByLabel("Link do projeto", { exact: true })
+    .getByLabel("Link do projeto", {
+      exact: true,
+    })
     .fill("https://portfolio.onrender.com");
   await page
-    .getByRole("button", { name: "Adicionar link", exact: true })
+    .getByRole("button", {
+      name: "Adicionar link",
+      exact: true,
+    })
     .click();
   await page
-    .getByRole("heading", { name: "Personalizar projeto", exact: true })
+    .getByRole("heading", {
+      name: "Personalizar projeto",
+      exact: true,
+    })
     .waitFor();
   assert.equal(githubInspections, 0);
   assert.equal(
@@ -121,21 +167,33 @@ try {
   );
   await page.getByLabel("Link externo do projeto").fill("");
   await page.getByLabel("Nome do projeto").fill("Meu planeta manual");
-  await page.getByLabel("Descrição", { exact: true }).fill("");
   await page
-    .getByRole("button", { name: "Criar projeto", exact: true })
+    .getByLabel("Descrição", {
+      exact: true,
+    })
+    .fill("");
+  await page
+    .getByRole("button", {
+      name: "Criar projeto",
+      exact: true,
+    })
     .click();
   await page
     .getByText(
       "Adicione um link do GitHub ou um link externo para criar o projeto.",
-      { exact: true },
+      {
+        exact: true,
+      },
     )
     .waitFor();
   await page
     .getByLabel("Link externo do projeto")
     .fill("https://example.com/my-project");
   await page
-    .getByRole("button", { name: "+ Adicionar linguagem", exact: true })
+    .getByRole("button", {
+      name: "+ Adicionar linguagem",
+      exact: true,
+    })
     .click();
   assert.equal(
     await page.locator(".language-options button").first().innerText(),
@@ -143,20 +201,44 @@ try {
   );
   await page.getByLabel("Pesquisar linguagem").fill("JavaS");
   assert.equal(await page.locator(".language-options button").count(), 2);
-  await page.getByRole("button", { name: "JavaScript", exact: true }).click();
   await page
-    .getByRole("button", { name: "+ Adicionar linguagem", exact: true })
+    .getByRole("button", {
+      name: "JavaScript",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("button", {
+      name: "+ Adicionar linguagem",
+      exact: true,
+    })
     .click();
   assert.equal(
     await page
-      .getByRole("button", { name: "JavaScript · adicionada", exact: true })
+      .getByRole("button", {
+        name: "JavaScript · adicionada",
+        exact: true,
+      })
       .isDisabled(),
     true,
   );
-  await page.getByRole("button", { name: "Outra", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: "Outra",
+      exact: true,
+    })
+    .click();
   await page.getByLabel("Nome da linguagem").fill("CSS");
-  await page.getByRole("button", { name: "Adicionar", exact: true }).click();
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .getByRole("button", {
+      name: "Adicionar",
+      exact: true,
+    })
+    .click();
+  await page.setViewportSize({
+    width: 390,
+    height: 844,
+  });
   assert.equal(
     await page.evaluate(
       () => document.documentElement.scrollWidth > innerWidth,
@@ -165,12 +247,21 @@ try {
   );
   await page.evaluate(() => scrollTo(0, 0));
   if (process.env.UI_SCREENSHOT)
-    await page.screenshot({ path: process.env.UI_SCREENSHOT, fullPage: true });
+    await page.screenshot({
+      path: process.env.UI_SCREENSHOT,
+      fullPage: true,
+    });
   await page
-    .getByRole("button", { name: "Criar projeto", exact: true })
+    .getByRole("button", {
+      name: "Criar projeto",
+      exact: true,
+    })
     .click();
   await page
-    .getByRole("heading", { name: "Meu planeta manual", exact: true })
+    .getByRole("heading", {
+      name: "Meu planeta manual",
+      exact: true,
+    })
     .waitFor();
   await page.waitForFunction(
     () =>
@@ -178,46 +269,91 @@ try {
   );
   const id = page.url().split("/").pop(),
     saved = (await api(owner, "/api/projects/" + id)).project;
-  assert.deepEqual(saved.languages, { JavaScript: null, CSS: null });
+  assert.deepEqual(saved.languages, {
+    JavaScript: null,
+    CSS: null,
+  });
   assert.equal(
     await page
-      .getByRole("link", { name: "Acessar projeto", exact: true })
+      .getByRole("link", {
+        name: "Acessar projeto",
+        exact: true,
+      })
       .getAttribute("href"),
     "https://example.com/my-project",
   );
   assert.equal(
     await page
-      .getByRole("link", { name: "Acessar GitHub", exact: true })
+      .getByRole("link", {
+        name: "Acessar GitHub",
+        exact: true,
+      })
       .count(),
     0,
   );
   await page
-    .getByRole("link", { name: "Dono do Planeta", exact: true })
+    .getByRole("link", {
+      name: "Dono do Planeta",
+      exact: true,
+    })
     .click();
   await page
-    .getByRole("heading", { name: "Dono do Planeta", exact: true })
+    .getByRole("heading", {
+      name: "Dono do Planeta",
+      exact: true,
+    })
     .waitFor();
   await page.goBack();
   await page
-    .getByRole("heading", { name: "Meu planeta manual", exact: true })
-    .waitFor();
-  await page.getByRole("link", { name: "Pesquisar contas e planetas" }).click();
-  await page
-    .getByLabel("Contas e planetas", { exact: true })
-    .fill("MEU PLANETA");
-  await page.getByRole("button", { name: "Pesquisar", exact: true }).click();
-  await page
-    .getByRole("heading", { name: "Meu planeta manual", exact: true })
+    .getByRole("heading", {
+      name: "Meu planeta manual",
+      exact: true,
+    })
     .waitFor();
   await page
-    .getByLabel("Contas e planetas", { exact: true })
-    .fill("Outro Viajante");
-  await page.getByRole("button", { name: "Pesquisar", exact: true }).click();
-  await page
-    .getByRole("link", { name: "Visualizar conta", exact: true })
+    .getByRole("link", {
+      name: "Pesquisar contas e planetas",
+    })
     .click();
   await page
-    .getByRole("heading", { name: "Outro Viajante", exact: true })
+    .getByLabel("Contas e planetas", {
+      exact: true,
+    })
+    .fill("MEU PLANETA");
+  await page
+    .getByRole("button", {
+      name: "Pesquisar",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("heading", {
+      name: "Meu planeta manual",
+      exact: true,
+    })
+    .waitFor();
+  await page
+    .getByLabel("Contas e planetas", {
+      exact: true,
+    })
+    .fill("Outro Viajante");
+  await page
+    .getByRole("button", {
+      name: "Pesquisar",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("link", {
+      name: "Visualizar conta",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("heading", {
+      name: "Outro Viajante",
+      exact: true,
+    })
     .waitFor();
   await page.goto(base + "/project/" + id);
   for (const [suffix, demoUrl] of [
@@ -233,17 +369,26 @@ try {
     ).project;
     await page.goto(base + "/project/" + created.id);
     await page
-      .getByRole("heading", { name: "Links " + suffix, exact: true })
+      .getByRole("heading", {
+        name: "Links " + suffix,
+        exact: true,
+      })
       .waitFor();
     assert.equal(
       await page
-        .getByRole("link", { name: "Acessar projeto", exact: true })
+        .getByRole("link", {
+          name: "Acessar projeto",
+          exact: true,
+        })
         .getAttribute("href"),
       demoUrl || "https://github.com/owner/repo",
     );
     assert.equal(
       await page
-        .getByRole("link", { name: "Acessar GitHub", exact: true })
+        .getByRole("link", {
+          name: "Acessar GitHub",
+          exact: true,
+        })
         .count(),
       demoUrl ? 1 : 0,
     );
@@ -252,7 +397,11 @@ try {
   await page.goto(base + "/project/" + id);
   const orbit = saved.orbit;
   await page.reload();
-  await page.getByRole("heading", { name: "Meu planeta manual" }).waitFor();
+  await page
+    .getByRole("heading", {
+      name: "Meu planeta manual",
+    })
+    .waitFor();
   assert.deepEqual(
     (await api(owner, "/api/projects/" + id)).project.orbit,
     orbit,
@@ -262,21 +411,37 @@ try {
   const otherPage = await other.newPage();
   await otherPage.goto(base + "/project/" + id);
   await otherPage
-    .getByRole("heading", { name: "Meu planeta manual" })
+    .getByRole("heading", {
+      name: "Meu planeta manual",
+    })
     .waitFor();
   assert.equal(
     await otherPage
-      .getByRole("button", { name: "Excluir projeto", exact: true })
+      .getByRole("button", {
+        name: "Excluir projeto",
+        exact: true,
+      })
       .count(),
     0,
   );
   await page
-    .getByRole("button", { name: "Excluir projeto", exact: true })
+    .getByRole("button", {
+      name: "Excluir projeto",
+      exact: true,
+    })
     .click();
   await page.getByRole("dialog").waitFor();
-  await page.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: "Cancelar",
+      exact: true,
+    })
+    .click();
   assert.ok((await api(owner, "/api/projects/" + id)).project);
-  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.setViewportSize({
+    width: 1440,
+    height: 900,
+  });
   await page.evaluate(async () => {
     const { Universe } = await import("/src/three/universe.js");
     const start = Universe.prototype.start;
@@ -285,18 +450,28 @@ try {
       return start.call(this);
     };
   });
-  await page.getByRole("link", { name: "Pesquisar contas e planetas" }).click();
   await page
-    .getByLabel("Contas e planetas", { exact: true })
+    .getByRole("link", {
+      name: "Pesquisar contas e planetas",
+    })
+    .click();
+  await page
+    .getByLabel("Contas e planetas", {
+      exact: true,
+    })
     .fill("Meu planeta manual");
-  await page.getByRole("button", { name: "Pesquisar", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: "Pesquisar",
+      exact: true,
+    })
+    .click();
   await page
     .getByRole("link", {
       name: "Ir para o planeta Meu planeta manual",
       exact: true,
     })
     .click();
-
   await page.waitForFunction(() => window.world?.running);
   assert.ok(
     await page.evaluate(
@@ -304,7 +479,11 @@ try {
       id,
     ),
   );
-  await page.getByRole("dialog", { name: "Informações do planeta" }).waitFor();
+  await page
+    .getByRole("dialog", {
+      name: "Informações do planeta",
+    })
+    .waitFor();
   const arrived = await page.evaluate((id) => {
     const u = window.world,
       p = u.planets.find((p) => p.userData.project.id === id);
@@ -322,23 +501,44 @@ try {
   assert.ok(arrived.safe && arrived.distance < arrived.radius + 65);
   assert.equal(arrived.velocity, 0);
   await page
-    .getByRole("button", { name: "Fechar projeto", exact: true })
+    .getByRole("button", {
+      name: "Fechar projeto",
+      exact: true,
+    })
     .click();
   await page.waitForFunction(() => !window.world.focus);
-  await page.getByRole("link", { name: "Pesquisar contas e planetas" }).click();
   await page
-    .getByLabel("Contas e planetas", { exact: true })
+    .getByRole("link", {
+      name: "Pesquisar contas e planetas",
+    })
+    .click();
+  await page
+    .getByLabel("Contas e planetas", {
+      exact: true,
+    })
     .fill("Meu planeta manual");
-  await page.getByRole("button", { name: "Pesquisar", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: "Pesquisar",
+      exact: true,
+    })
+    .click();
   await page
     .getByRole("link", {
       name: "Ir para o planeta Meu planeta manual",
       exact: true,
     })
     .click();
-  await page.getByRole("dialog", { name: "Informações do planeta" }).waitFor();
   await page
-    .getByRole("button", { name: "Fechar projeto", exact: true })
+    .getByRole("dialog", {
+      name: "Informações do planeta",
+    })
+    .waitFor();
+  await page
+    .getByRole("button", {
+      name: "Fechar projeto",
+      exact: true,
+    })
     .click();
   await page.waitForFunction(() => !window.world.focus);
   // Focus through the same callback used by a raycast click; controls must pause.
@@ -353,7 +553,11 @@ try {
     u.onFocus(p.userData.project);
     return saved;
   }, id);
-  await page.getByRole("dialog", { name: "Informações do planeta" }).waitFor();
+  await page
+    .getByRole("dialog", {
+      name: "Informações do planeta",
+    })
+    .waitFor();
   await page.waitForFunction(() => window.world.focus?.elapsed === 0.8);
   assert.deepEqual(
     await page.evaluate(() => window.world.ship.position.toArray()),
@@ -369,7 +573,10 @@ try {
   });
   assert.ok(framed.distance > framed.radius * 1.1);
   await page
-    .getByRole("button", { name: "Fechar projeto", exact: true })
+    .getByRole("button", {
+      name: "Fechar projeto",
+      exact: true,
+    })
     .click();
   await page.waitForFunction(() => !window.world.focus); // Restoration occurs before normal follow resumes.
   await page.evaluate(
@@ -381,12 +588,20 @@ try {
     id,
   );
   await page
-    .getByRole("dialog", { name: "Informações do planeta" })
-    .getByRole("button", { name: "Excluir projeto", exact: true })
+    .getByRole("dialog", {
+      name: "Informações do planeta",
+    })
+    .getByRole("button", {
+      name: "Excluir projeto",
+      exact: true,
+    })
     .click();
   await page
     .locator(".confirm-dialog")
-    .getByRole("button", { name: "Excluir projeto", exact: true })
+    .getByRole("button", {
+      name: "Excluir projeto",
+      exact: true,
+    })
     .click();
   await page.waitForFunction(
     (id) => !window.world.planets.some((p) => p.userData.project.id === id),
@@ -396,10 +611,24 @@ try {
     (await owner.request.get(base + "/api/projects/" + id)).status(),
     404,
   );
-  await page.getByRole("link", { name: "Projetos", exact: true }).click();
-  await page.getByRole("heading", { name: "Projetos", exact: true }).waitFor();
+  await page
+    .getByRole("link", {
+      name: "Projetos",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("heading", {
+      name: "Projetos",
+      exact: true,
+    })
+    .waitFor();
   assert.equal(
-    await page.getByRole("heading", { name: "Meu planeta manual" }).count(),
+    await page
+      .getByRole("heading", {
+        name: "Meu planeta manual",
+      })
+      .count(),
     0,
   );
   // Tooltip uses the same renderer as live GitHub results and is keyboard-accessible.
@@ -418,7 +647,11 @@ try {
       }) +
       "</ol>";
   });
-  await page.getByRole("link", { name: /Teste da timeline/ }).focus();
+  await page
+    .getByRole("link", {
+      name: /Teste da timeline/,
+    })
+    .focus();
   await page.getByRole("tooltip").waitFor();
   assert.match(
     await page.getByRole("tooltip").innerText(),
@@ -434,5 +667,8 @@ try {
   server.kill();
   if (server.exitCode === null)
     await new Promise((r) => server.once("exit", r));
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, {
+    recursive: true,
+    force: true,
+  });
 }

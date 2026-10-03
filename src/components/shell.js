@@ -1,6 +1,7 @@
 export function shell(content, active = "") {
   return `<div class="app-shell"><header class="topbar"><a class="logo" data-route href="/">Orbitfolio<span>◌</span></a><nav aria-label="Navegação principal">${[
     ["/", "Início"],
+    ["/explore", "Explorar"],
     ["/projects", "Projetos"],
     ["/progress", "Progresso"],
     ["/favorites", "Favoritos"],

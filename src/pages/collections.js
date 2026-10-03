@@ -60,3 +60,11 @@ export async function renderFeatured(root, period = "week") {
     if (target) renderFeatured(root, target);
   });
 }
+
+export async function renderExplore(root) {
+  const projects = await api.projects.list();
+  root.innerHTML = shell(
+    `<main class="page"><p class="eyebrow">COMUNIDADE</p><h1>Explorar</h1><p>Conheça os projetos públicos dos viajantes.</p>${cards(projects.filter((p) => !p.github.private))}</main>`,
+    "/explore",
+  );
+}

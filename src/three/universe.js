@@ -1,3 +1,6 @@
+import { FlightControls } from "./flight-controls.js";
+import { aimedPlanet } from "./planet-interaction.js";
+import { escapeHtml as e } from "../utils/html.js";
 import * as THREE from "three";
 import { framingDistance } from "./preview.js";
 import { createPlanet, disposePlanet } from "./planet-factory.js";
@@ -71,6 +74,7 @@ export class Universe {
   removeProject(id) {
     const removed = this.planets.find((p) => p.userData.project.id === id);
     if (!removed) return;
+    if (this.aim === removed) this.setAim(null);
     this.scene.remove(removed);
     disposePlanet(removed);
     this.planets = this.planets.filter((p) => p !== removed);
@@ -132,55 +136,91 @@ export class Universe {
             ),
           ),
       );
+      this.controls.yaw = this.ship.rotation.y;
+      this.controls.pitch = 0;
       this.spawned = true;
     }
   }
   bind() {
-    addEventListener("keydown", (event) => {
-      if (
-        !this.running ||
-        this.focus ||
-        ["INPUT", "TEXTAREA", "SELECT"].includes(
-          document.activeElement?.tagName,
-        )
-      )
-        return;
-      if (
-        ["Space", "ShiftLeft", "KeyW", "KeyA", "KeyS", "KeyD"].includes(
-          event.code,
-        )
-      )
-        event.preventDefault();
-      this.keys.add(event.code);
-      if (
-        !this.hasMoved &&
-        ["KeyW", "KeyA", "KeyS", "KeyD", "Space", "ShiftLeft"].includes(
-          event.code,
-        )
-      ) {
-        this.hasMoved = true;
-        this.onFirstMovement();
-      }
+    this.hud = document.createElement("div");
+    this.hud.className = "navigation-hud";
+    this.hud.hidden = true;
+    this.hud.innerHTML =
+      '<span class="flight-crosshair" aria-hidden="true">+</span><small class="pointer-hint">ESC — Liberar cursor</small><div class="aim-info" hidden></div>';
+    this.canvas.parentElement.append(this.hud);
+    this.controls = new FlightControls(this.canvas, {
+      canNavigate: () => this.running && !this.focus,
+      onMode: (active) => {
+        this.hud.hidden = !active;
+        if (!active) this.setAim(null);
+      },
+      onInteract: () => {
+        this.updateAim();
+        if (this.aim) {
+          const project = this.aim.userData.project;
+          this.controls.release();
+          this.onFocus(project);
+        }
+      },
+      onMove: () => {
+        if (!this.hasMoved) {
+          this.hasMoved = true;
+          this.onFirstMovement();
+        }
+      },
     });
-    addEventListener("blur", () => this.keys.clear());
-    addEventListener("keyup", (event) => this.keys.delete(event.code));
-    addEventListener("resize", () => this.resize());
-    this.canvas.addEventListener("pointerdown", (event) => {
-      if (this.focus) return;
+    this.keys = this.controls.keys;
+    this.resizeListener = () => this.resize();
+    addEventListener("resize", this.resizeListener);
+    this.fallbackClick = (event) => {
+      if (!this.controls.fallback || this.focus || !this.running) return;
       const rect = this.canvas.getBoundingClientRect();
       this.pointer.set(
         ((event.clientX - rect.left) / rect.width) * 2 - 1,
         -((event.clientY - rect.top) / rect.height) * 2 + 1,
       );
       this.raycaster.setFromCamera(this.pointer, this.camera);
-      const hits = this.raycaster.intersectObjects(this.planets, true);
-      if (hits[0]) {
-        let object = hits[0].object;
-        while (object.parent && !this.planets.includes(object))
-          object = object.parent;
-        this.onFocus(object.userData.project);
-      }
-    });
+      const hit = this.raycaster.intersectObjects(
+        this.planets.map((p) => p.userData.surface),
+        false,
+      )[0];
+      const planet = this.planets.find(
+        (p) => p.userData.surface === hit?.object,
+      );
+      if (planet) this.onFocus(planet.userData.project);
+    };
+    this.canvas.addEventListener("click", this.fallbackClick);
+  }
+  setAim(planet) {
+    if (planet === this.aim) return;
+    if (this.aim)
+      this.aim.userData.surface.material.emissiveIntensity = this.aimIntensity;
+    this.aim = planet;
+    const info = this.hud.querySelector(".aim-info");
+    info.hidden = !planet;
+    if (planet) {
+      this.aimIntensity = planet.userData.surface.material.emissiveIntensity;
+      planet.userData.surface.material.emissiveIntensity = 2.4;
+      const p = planet.userData.project;
+      info.innerHTML = `<strong>${e(p.name)}</strong><span>${e(p.owner.name)} · @${e(p.owner.username)}</span><small>${Object.keys(
+        p.languages || {},
+      )
+        .slice(0, 3)
+        .map(e)
+        .join(" · ")}</small><b>[E] Explorar</b>`;
+    }
+  }
+  updateAim() {
+    this.setAim(
+      this.controls.navigation && !this.focus
+        ? aimedPlanet(
+            this.camera,
+            this.planets,
+            this.ship.position,
+            this.raycaster,
+          )
+        : null,
+    );
   }
   resize() {
     const { clientWidth: width, clientHeight: height } = this.canvas;
@@ -242,6 +282,8 @@ export class Universe {
     this.ship.userData.velocity.set(0, 0, 0);
     const direction = planet.position.clone().sub(target);
     this.ship.rotation.set(0, Math.atan2(-direction.x, -direction.z), 0);
+    this.controls.yaw = this.ship.rotation.y;
+    this.controls.pitch = 0;
     this.camera.position
       .copy(target)
       .add(new THREE.Vector3(0, 4.3, 12).applyQuaternion(this.ship.quaternion));
@@ -276,6 +318,7 @@ export class Universe {
     f.elapsed = 0;
   }
   focusPlanet(id) {
+    this.controls.release();
     const planet = this.planets.find((p) => p.userData.project.id === id);
     if (!planet) return;
     this.keys.clear();
@@ -320,16 +363,33 @@ export class Universe {
     if (t === 1 && f.returning) this.focus = null;
   }
   updateFlight(delta) {
+    if (this.controls.blocked()) this.keys.clear();
+    if (this.controls.navigation)
+      this.ship.rotation.set(this.controls.pitch, this.controls.yaw, 0, "YXZ");
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(
       this.ship.quaternion,
     );
     const acceleration =
       (this.keys.has("KeyW") ? 22 : 0) - (this.keys.has("KeyS") ? 15 : 0);
     this.ship.userData.velocity.addScaledVector(forward, acceleration * delta);
-    if (this.keys.has("KeyA")) this.ship.rotation.y += 1.45 * delta;
-    if (this.keys.has("KeyD")) this.ship.rotation.y -= 1.45 * delta;
+    if (this.controls.navigation) {
+      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(
+        this.ship.quaternion,
+      );
+      this.ship.userData.velocity.addScaledVector(
+        right,
+        ((this.keys.has("KeyD") ? 1 : 0) - (this.keys.has("KeyA") ? 1 : 0)) *
+          18 *
+          delta,
+      );
+    } else {
+      if (this.keys.has("KeyA")) this.ship.rotation.y += 1.45 * delta;
+      if (this.keys.has("KeyD")) this.ship.rotation.y -= 1.45 * delta;
+      this.controls.yaw = this.ship.rotation.y;
+    }
     if (this.keys.has("Space")) this.ship.userData.velocity.y += 13 * delta;
-    if (this.keys.has("ShiftLeft")) this.ship.userData.velocity.y -= 13 * delta;
+    if (this.keys.has("ShiftLeft") || this.keys.has("ShiftRight"))
+      this.ship.userData.velocity.y -= 13 * delta;
     this.ship.userData.velocity.multiplyScalar(Math.pow(0.985, delta));
     this.ship.userData.velocity.clampLength(0, 30);
   }
@@ -355,6 +415,7 @@ export class Universe {
           new THREE.Vector3(0, 0.25, -8).applyQuaternion(this.ship.quaternion),
         ),
     );
+    this.updateAim();
     this.planets.forEach((planet) => {
       planet.rotation.y += planet.userData.spin * delta * 60;
       planet.userData.atmosphere.rotation.y += 0.025 * delta;
@@ -371,6 +432,7 @@ export class Universe {
     }
   }
   stop() {
+    this.controls.release();
     this.running = false;
     cancelAnimationFrame(this.frameId);
     this.keys.clear();
@@ -378,6 +440,11 @@ export class Universe {
   }
   dispose() {
     this.stop();
+    this.controls.dispose();
+    removeEventListener("resize", this.resizeListener);
+    this.canvas.removeEventListener("click", this.fallbackClick);
+    this.hud.remove();
+    for (const planet of this.planets) disposePlanet(planet);
     this.renderer.dispose();
   }
 }

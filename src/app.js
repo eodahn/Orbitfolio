@@ -13,6 +13,7 @@ import {
 import { renderHome, pauseUniverse } from "./pages/home.js";
 import {
   renderProjects,
+  renderExplore,
   renderProgress,
   renderFavorites,
   renderFeatured,
@@ -33,6 +34,7 @@ const route = (render) => async () => {
   await render(root);
 };
 registerRoute("/", async () => renderHome(root));
+registerRoute("/explore", route(renderExplore));
 registerRoute("/projects", route(renderProjects));
 registerRoute("/projects/new", route(renderCreateProject));
 registerRoute("/progress", route(renderProgress));

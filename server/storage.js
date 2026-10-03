@@ -21,7 +21,7 @@ export function prepareDatabasePath(filename, env = process.env) {
   return path;
 }
 export function storageWarnings(env = process.env) {
-  if (!env.RENDER) return [];
+  if (!env.RENDER || env.DATABASE_URL) return [];
   if (
     !env.ORBITFOLIO_DATABASE_PATH ||
     !isAbsolute(env.ORBITFOLIO_DATABASE_PATH)

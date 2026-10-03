@@ -102,7 +102,11 @@ export async function githubRequest(path, { token, fetcher = fetch } = {}) {
           Accept: "application/vnd.github+json",
           "X-GitHub-Api-Version": "2022-11-28",
           "User-Agent": "Orbitfolio",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(token
+            ? {
+                Authorization: `Bearer ${token}`,
+              }
+            : {}),
         },
         redirect: "manual",
         signal: AbortSignal.timeout(12000),
@@ -152,7 +156,11 @@ export async function githubRequest(path, { token, fetcher = fetch } = {}) {
           ? "Autorize o acesso SSO da sua organização no GitHub e tente novamente."
           : "O GitHub negou acesso. Verifique as permissões do aplicativo OAuth na organização ou reconecte sua conta GitHub.",
       );
-    if (response.status === 409) return { data: [], hasNext: false };
+    if (response.status === 409)
+      return {
+        data: [],
+        hasNext: false,
+      };
     throw new ApiError(
       502,
       "Não foi possível consultar o GitHub. Tente novamente.",
@@ -242,25 +250,29 @@ export function createGithubService(
   { env = process.env, fetcher = fetch } = {},
 ) {
   const config = githubConfig(env);
-  const tokenFor = (user) => {
+  const tokenFor = async (user) => {
     requireUser(user);
     if (!config.enabled)
       throw new ApiError(
         503,
         "Integração GitHub indisponível. O servidor precisa ser configurado.",
       );
-    const row = db
+    const row = await db
       .prepare("SELECT * FROM github_connections WHERE user_id=?")
       .get(user.id);
     if (!row)
       throw new ApiError(401, "Conecte sua conta GitHub para continuar.");
     return decryptToken(row.encrypted_token, user.id, config);
   };
-  const request = (path, token) => githubRequest(path, { token, fetcher });
+  const request = async (path, token) =>
+    await githubRequest(path, {
+      token,
+      fetcher,
+    });
   return {
-    status(user) {
+    async status(user) {
       requireUser(user);
-      const row = db
+      const row = await db
         .prepare("SELECT * FROM github_connections WHERE user_id=?")
         .get(user.id);
       let connected = config.enabled && !!row;
@@ -287,7 +299,7 @@ export function createGithubService(
           : null,
       };
     },
-    connect(user, cookies) {
+    async connect(user, cookies) {
       requireUser(user);
       if (!config.enabled)
         throw new ApiError(
@@ -298,16 +310,22 @@ export function createGithubService(
       if (!session) throw new ApiError(401, "Entre novamente.");
       const state = randomBytes(32).toString("base64url"),
         verifier = randomBytes(32).toString("base64url");
-      db.prepare(
-        "DELETE FROM github_oauth_states WHERE expires_at<? OR user_id=?",
-      ).run(Date.now(), user.id);
-      db.prepare("INSERT INTO github_oauth_states VALUES(?,?,?,?,?)").run(
-        sha(state),
-        user.id,
-        sha(session),
-        encryptToken(verifier, user.id, config),
-        Date.now() + 10 * 60 * 1000,
-      );
+      await db.transaction(async (db) => {
+        await db
+          .prepare(
+            "DELETE FROM github_oauth_states WHERE expires_at<? OR user_id=?",
+          )
+          .run(Date.now(), user.id);
+        await db
+          .prepare("INSERT INTO github_oauth_states VALUES(?,?,?,?,?)")
+          .run(
+            sha(state),
+            user.id,
+            sha(session),
+            encryptToken(verifier, user.id, config),
+            Date.now() + 10 * 60 * 1000,
+          );
+      });
       const params = new URLSearchParams({
         client_id: config.clientId,
         redirect_uri: config.callbackUrl,
@@ -318,14 +336,16 @@ export function createGithubService(
           .digest("base64url"),
         code_challenge_method: "S256",
       });
-      return { url: "https://github.com/login/oauth/authorize?" + params };
+      return {
+        url: "https://github.com/login/oauth/authorize?" + params,
+      };
     },
     async callback(user, cookies, query) {
       requireUser(user);
       if (!config.enabled)
         throw new ApiError(503, "Integração indisponível.", "not_configured");
       const state = String(query.get("state") || ""),
-        row = db
+        row = await db
           .prepare("SELECT * FROM github_oauth_states WHERE state_hash=?")
           .get(sha(state));
       if (
@@ -339,9 +359,11 @@ export function createGithubService(
           "Autorização inválida ou expirada. Tente conectar novamente.",
           "invalid_state",
         );
-      db.prepare("DELETE FROM github_oauth_states WHERE state_hash=?").run(
-        sha(state),
-      );
+      const consumed = await db
+        .prepare("DELETE FROM github_oauth_states WHERE state_hash=?")
+        .run(sha(state));
+      if (consumed.changes !== 1)
+        throw new ApiError(403, "Autorização já utilizada.", "invalid_state");
       if (query.get("error"))
         throw new ApiError(403, "Autorização GitHub cancelada.", "cancelled");
       if (!query.get("code"))
@@ -401,35 +423,47 @@ export function createGithubService(
       const { data: identity } = await request("/user", payload.access_token);
       if (!identity?.id || !identity?.login)
         throw new ApiError(502, "Identidade GitHub inválida.", "unavailable");
-      db.prepare(
-        "INSERT INTO github_connections(user_id,github_user_id,github_login,encrypted_token) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET github_user_id=excluded.github_user_id,github_login=excluded.github_login,encrypted_token=excluded.encrypted_token,updated_at=CURRENT_TIMESTAMP",
-      ).run(
-        user.id,
-        identity.id,
-        identity.login,
-        encryptToken(payload.access_token, user.id, config),
-      );
-      db.prepare(
-        "UPDATE github_connections SET github_name=?,github_avatar_url=?,github_profile_url=? WHERE user_id=?",
-      ).run(
-        identity.name || identity.login,
-        identity.avatar_url || "",
-        identity.html_url || "",
-        user.id,
-      );
+      await db.transaction(async (db) => {
+        await db
+          .prepare(
+            "INSERT INTO github_connections(user_id,github_user_id,github_login,encrypted_token) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET github_user_id=excluded.github_user_id,github_login=excluded.github_login,encrypted_token=excluded.encrypted_token,updated_at=CURRENT_TIMESTAMP",
+          )
+          .run(
+            user.id,
+            identity.id,
+            identity.login,
+            encryptToken(payload.access_token, user.id, config),
+          );
+        await db
+          .prepare(
+            "UPDATE github_connections SET github_name=?,github_avatar_url=?,github_profile_url=? WHERE user_id=?",
+          )
+          .run(
+            identity.name || identity.login,
+            identity.avatar_url || "",
+            identity.html_url || "",
+            user.id,
+          );
+      });
     },
-    disconnect(user) {
+    async disconnect(user) {
       requireUser(user);
-      db.prepare("DELETE FROM github_connections WHERE user_id=?").run(user.id);
-      db.prepare("DELETE FROM github_oauth_states WHERE user_id=?").run(
-        user.id,
-      );
-      db.prepare("DELETE FROM project_imports WHERE user_id=?").run(user.id);
+      await db.transaction(async (db) => {
+        await db
+          .prepare("DELETE FROM github_connections WHERE user_id=?")
+          .run(user.id);
+        await db
+          .prepare("DELETE FROM github_oauth_states WHERE user_id=?")
+          .run(user.id);
+        await db
+          .prepare("DELETE FROM project_imports WHERE user_id=?")
+          .run(user.id);
+      });
     },
     async repositories(user, page = 1) {
       const { data, hasNext } = await request(
         `/user/repos?per_page=30&page=${page}&sort=updated&affiliation=owner,collaborator,organization_member`,
-        tokenFor(user),
+        await tokenFor(user),
       );
       return {
         repositories: data.map((r) => ({
@@ -450,7 +484,7 @@ export function createGithubService(
         );
       const integrated = input.integrated === true,
         { path } = repositoryPath(input.url || input.fullName),
-        token = integrated ? tokenFor(user) : undefined;
+        token = integrated ? await tokenFor(user) : undefined;
       const { data: repo } = await request(path, token);
       if (repo.private && !integrated)
         throw new ApiError(
@@ -461,10 +495,14 @@ export function createGithubService(
         repositoryPath(repo.full_name).path + "/languages",
         token,
       );
-      return saveImport(db, user, mapRepository(repo, languages, integrated));
+      return await saveImport(
+        db,
+        user,
+        mapRepository(repo, languages, integrated),
+      );
     },
     async authorize(user, project) {
-      const token = tokenFor(user),
+      const token = await tokenFor(user),
         { path } = repositoryPath(project.github_repository_full_name);
       const { data: repo } = await request(path, token);
       if (Number(repo.id) !== Number(project.github_repository_id))
@@ -472,7 +510,11 @@ export function createGithubService(
           403,
           "O vínculo do repositório mudou. Reimporte o projeto.",
         );
-      return { token, path, repo };
+      return {
+        token,
+        path,
+        repo,
+      };
     },
     async commits(user, project, page = 1) {
       if (!project.github_integration_enabled)
@@ -525,7 +567,6 @@ export function createGithubService(
       } catch (error) {
         if ([401, 403].includes(error.status)) throw error;
       }
-
       return {
         commits: result.data.map((c) => ({
           sha: c.sha,

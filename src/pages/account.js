@@ -1,3 +1,5 @@
+import { bindCharacterCounts } from "../components/character-count.js";
+import { editAvatar, avatarFormData } from "../components/avatar-editor.js";
 import { api } from "../api/index.js";
 import { shell, toast } from "../components/shell.js";
 import { navigate } from "../router/router.js";
@@ -66,7 +68,7 @@ export async function renderProfile(root, id) {
         "",
       )}<button class="button button-primary">Salvar privacidade</button></form>`;
   else if (tab === "edit")
-    body = `<form data-profile class="profile-form"><label>Nome<input name="name" value="${e(user.name)}" required minlength="2" maxlength="80"></label><label>Username<input name="username" value="${e(user.username)}" required pattern="[a-zA-Z0-9_-]{3,64}"></label><label>Informações do perfil<textarea name="bio" maxlength="500">${e(user.bio)}</textarea></label><label>URL da foto<input name="avatarUrl" type="url" value="${e(user.avatarUrl)}"></label><button class="button button-primary">Salvar perfil</button></form>`;
+    body = `<form data-profile class="profile-form"><label>Nome de exibição<input aria-label="Nome de exibição" name="name" value="${e(user.name)}" required minlength="2" maxlength="50"></label><label>Username<input name="username" value="${e(user.username)}" required maxlength="50" pattern="[a-zA-Z0-9_-]{3,50}"></label><label>Informações do perfil<textarea name="bio" maxlength="500">${e(user.bio)}</textarea></label><label>Foto de perfil<input data-avatar type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label><p>PNG, JPG, WebP ou GIF animado · até 5 MB.</p><button class="button button-primary">Salvar perfil</button></form>`;
   else {
     const data = await api.users.section(user.id, tab);
     body = data.users
@@ -78,7 +80,7 @@ export async function renderProfile(root, id) {
         : "<p>Nenhum planeta nesta lista.</p>";
   }
   root.innerHTML = shell(
-    `<main class="page profile-page"><header class="profile-heading">${avatar(user)}<div><p class="eyebrow">${own ? "MINHA CONTA" : "PERFIL DO VIAJANTE"}</p><h1>${e(user.name)}</h1><p>@${e(user.username)}</p><p class="lead">${e(user.bio)}</p><p>${user.projects} planetas${!own && user.isFriend ? " · Vocês são amigos" : !own && user.followsViewer ? " · Segue você" : ""}</p></div></header><div class="actions">${own ? '<a class="button" data-route href="/progress">Meu progresso</a><button class="button" data-logout>Sair</button>' : `<button class="button button-primary" data-follow>${user.following ? "Deixar de seguir" : "Seguir"}</button>`}</div><nav class="profile-tabs" aria-label="Seções do perfil">${Object.keys(
+    `<main class="page profile-page"><header class="profile-heading">${avatar(user)}<div><p class="eyebrow">${user.isDemo ? "PERFIL DEMONSTRATIVO · SEM VÍNCULO COM O CRIADOR" : own ? "MINHA CONTA" : "PERFIL DO VIAJANTE"}</p><h1>${e(user.name)}</h1><p>@${e(user.username)}</p><p class="lead">${e(user.bio)}</p><p>${user.projects} planetas${!own && user.isFriend ? " · Vocês são amigos" : !own && user.followsViewer ? " · Segue você" : ""}</p></div></header><div class="actions">${own ? '<a class="button" data-route href="/progress">Meu progresso</a><button class="button" data-logout>Sair</button>' : `<button class="button button-primary" data-follow>${user.following ? "Deixar de seguir" : "Seguir"}</button>`}</div><nav class="profile-tabs" aria-label="Seções do perfil">${Object.keys(
       categories,
     )
       .filter(allowed)
@@ -91,6 +93,25 @@ export async function renderProfile(root, id) {
       )}</nav><section aria-label="${categories[tab]}"><h2>${tab === "projects" && !own ? "Planetas" : categories[tab]}</h2>${body}</section></main>`,
     own ? "/account" : "/social",
   );
+  bindCharacterCounts(root);
+  root
+    .querySelector("[data-avatar]")
+    ?.addEventListener("change", async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        const draft = await editAvatar(file);
+        if (draft) {
+          await api.users.uploadAvatar(avatarFormData(draft));
+          toast("Foto salva.");
+          await renderProfile(root, id);
+        }
+      } catch (error) {
+        toast(error.message, "error");
+      } finally {
+        event.target.value = "";
+      }
+    });
   root
     .querySelector("[data-follow]")
     ?.addEventListener("click", async (event) => {
@@ -130,9 +151,29 @@ export async function renderProfile(root, id) {
 }
 export function renderLogin(root, register = false) {
   const label = register ? "Criar conta" : "Entrar";
+  let avatarDraft = null;
   root.innerHTML = shell(
-    `<main class="page narrow auth-page"><p class="eyebrow">${register ? "NOVA ÓRBITA" : "BOAS-VINDAS"}</p><h1>${label}</h1><form class="auth-card" data-auth>${register ? `<label>Nome<input required name="name" autocomplete="name"></label>` : ""}<label>E-mail<input required type="email" name="email" autocomplete="email"></label><label>Senha<input required minlength="8" type="password" name="password" autocomplete="${register ? "new-password" : "current-password"}"></label><button class="button button-primary">${label}</button><p data-auth-error class="form-error" role="alert"></p></form><p class="auth-switch">${register ? "Já possui uma conta?" : "Ainda não possui conta?"} <a data-route href="${register ? "/login" : "/register"}">${register ? "Entrar" : "Criar conta"}</a></p></main>`,
+    `<main class="page narrow auth-page"><p class="eyebrow">${register ? "NOVA ÓRBITA" : "BOAS-VINDAS"}</p><h1>${label}</h1><form class="auth-card" data-auth>${register ? `<label>Nome de exibição<input aria-label="Nome de exibição" required name="name" minlength="2" maxlength="50" autocomplete="name"></label><label>Username<input required name="username" minlength="3" maxlength="50" pattern="[a-zA-Z0-9_-]{3,50}" autocomplete="username"></label><label>Foto de perfil (opcional)<input data-register-avatar type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label><p data-avatar-summary></p>` : ""}<label>E-mail<input required type="email" name="email" autocomplete="email"></label><label>Senha<input required minlength="8" type="password" name="password" autocomplete="${register ? "new-password" : "current-password"}"></label><button class="button button-primary">${label}</button><p data-auth-error class="form-error" role="alert"></p></form><p class="auth-switch">${register ? "Já possui uma conta?" : "Ainda não possui conta?"} <a data-route href="${register ? "/login" : "/register"}">${register ? "Entrar" : "Criar conta"}</a></p></main>`,
   );
+  bindCharacterCounts(root);
+  root
+    .querySelector("[data-register-avatar]")
+    ?.addEventListener("change", async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        const draft = await editAvatar(file);
+        if (draft) {
+          avatarDraft = draft;
+          root.querySelector("[data-avatar-summary]").textContent =
+            "Foto enquadrada. Será salva ao criar a conta.";
+        }
+      } catch (error) {
+        root.querySelector("[data-auth-error]").textContent = error.message;
+      } finally {
+        event.target.value = "";
+      }
+    });
   root
     .querySelector("[data-auth]")
     .addEventListener("submit", async (event) => {
@@ -146,6 +187,15 @@ export function renderLogin(root, register = false) {
       const data = Object.fromEntries(new FormData(form));
       try {
         await (register ? api.auth.register : api.auth.login)(data);
+        if (register && avatarDraft) {
+          try {
+            await api.users.uploadAvatar(avatarFormData(avatarDraft));
+          } catch (error) {
+            await navigate("/account?tab=edit");
+            toast("Conta criada. Foto não salva: " + error.message, "error");
+            return;
+          }
+        }
         await navigate("/account");
       } catch (error) {
         errorBox.textContent =

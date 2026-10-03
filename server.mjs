@@ -1,3 +1,5 @@
+import { seedShowcase } from "./server/showcase.js";
+import { readAvatarMultipart, saveAvatar } from "./server/avatars.js";
 import { oauthErrorCode } from "./shared/oauth-errors.js";
 import { storageWarnings } from "./server/storage.js";
 import { searchAll } from "./server/search.js";
@@ -7,7 +9,7 @@ import http from "node:http";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
-import { openDatabase } from "./server/db.js";
+import { openConfiguredDatabase } from "./server/db.js";
 import { seedDevelopmentData } from "./server/seed.js";
 import {
   ApiError,
@@ -24,19 +26,26 @@ import {
   sessionUser,
   setRelation,
 } from "./server/app.js";
-
 import {
   profileSection,
   updatePrivacy,
   updateProfile,
 } from "./server/social.js";
-
 const root = fileURLToPath(new URL(".", import.meta.url));
 for (const warning of storageWarnings()) console.warn(warning);
-const db = openDatabase();
+let db;
+try {
+  db = await openConfiguredDatabase();
+} catch {
+  console.error(
+    "Não foi possível iniciar o banco. Confira DATABASE_URL, conectividade e permissões.",
+  );
+  process.exit(1);
+}
+if (process.env.SEED_SHOWCASE === "true") await seedShowcase(db);
 if (process.env.SEED_DEMO === "true" && process.env.NODE_ENV !== "production")
-  seedDevelopmentData(db);
-ensureOrbits(db);
+  await seedDevelopmentData(db);
+await ensureOrbits(db);
 const github = createGithubService(db);
 const types = {
   ".html": "text/html; charset=utf-8",
@@ -87,25 +96,62 @@ function csrf(req) {
   if (origin && !allowed.has(origin))
     throw new ApiError(403, "Origem inválida.");
 }
-
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const path = url.pathname;
     csrf(req);
-    const user = sessionUser(db, req.headers.cookie);
+    const user = await sessionUser(db, req.headers.cookie);
     const page = () => {
       const value = Number(url.searchParams.get("page") || 1);
       if (!Number.isSafeInteger(value) || value < 1 || value > 10000)
         throw new ApiError(422, "Página inválida.");
       return value;
     };
+    if (path === "/api/account/avatar" && req.method === "POST") {
+      requireUser(user);
+      await saveAvatar(db, user, await readAvatarMultipart(req));
+      return reply(res, 200, { user: await publicUser(db, user, user.id) });
+    }
+    const avatarRoute = path.match(/^\/api\/users\/([^/]+)\/avatar$/);
+    if (avatarRoute && req.method === "GET") {
+      const row = await db
+        .prepare("SELECT * FROM user_avatars WHERE user_id=?")
+        .get(decodeURIComponent(avatarRoute[1]));
+      if (
+        !row ||
+        (url.searchParams.has("v") && url.searchParams.get("v") !== row.version)
+      )
+        throw new ApiError(404, "Foto não encontrada.");
+      const headers = {
+        "Content-Type": row.mime_type,
+        "Content-Length": row.size_bytes,
+        "Cache-Control": url.searchParams.has("v")
+          ? "public, max-age=31536000, immutable"
+          : "public, max-age=300",
+        ETag: '"' + row.version + '"',
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'; sandbox",
+      };
+      if (req.headers["if-none-match"] === headers.ETag) {
+        res.writeHead(304, {
+          ETag: headers.ETag,
+          "Cache-Control": headers["Cache-Control"],
+        });
+        return res.end();
+      }
+      res.writeHead(200, headers);
+      return res.end(Buffer.from(row.data));
+    }
     if (path === "/api/github/status" && req.method === "GET")
-      return reply(res, 200, github.status(requireUser(user)));
+      return reply(res, 200, await github.status(requireUser(user)));
     if (path === "/api/github/auth" && req.method === "GET") {
       if (req.headers["sec-fetch-site"] === "cross-site")
         throw new ApiError(403, "Inicie a conexão pelo Orbitfolio.");
-      const target = github.connect(requireUser(user), req.headers.cookie);
+      const target = await github.connect(
+        requireUser(user),
+        req.headers.cookie,
+      );
       res.writeHead(303, {
         Location: target.url,
         "Cache-Control": "no-store",
@@ -117,10 +163,10 @@ const server = http.createServer(async (req, res) => {
       return reply(
         res,
         200,
-        github.connect(requireUser(user), req.headers.cookie),
+        await github.connect(requireUser(user), req.headers.cookie),
       );
     if (path === "/api/github/disconnect" && req.method === "DELETE") {
-      github.disconnect(requireUser(user));
+      await github.disconnect(requireUser(user));
       return reply(res, 204);
     }
     if (path === "/api/github/callback" && req.method === "GET") {
@@ -154,68 +200,91 @@ const server = http.createServer(async (req, res) => {
     if (path === "/api/projects/mine" && req.method === "GET") {
       requireUser(user);
       return reply(res, 200, {
-        projects: db
-          .prepare(
-            "SELECT * FROM projects WHERE owner_id=? ORDER BY created_at DESC",
-          )
-          .all(user.id)
-          .map((p) => publicProject(db, p, user.id)),
+        projects: await Promise.all(
+          (
+            await db
+              .prepare(
+                "SELECT * FROM projects WHERE owner_id=? ORDER BY created_at DESC",
+              )
+              .all(user.id)
+          ).map(async (p) => await publicProject(db, p, user.id)),
+        ),
       });
     }
     if (path === "/api/search" && req.method === "GET")
       return reply(
         res,
         200,
-        searchAll(db, url.searchParams.get("q"), user?.id),
+        await searchAll(db, url.searchParams.get("q"), user?.id),
       );
     if (path === "/api/health" && req.method === "GET")
-      return reply(res, 200, { ok: true, backend: "node-sqlite" });
+      return reply(res, 200, {
+        ok: true,
+        backend: `node-${db.dialect}`,
+      });
     if (path === "/api/auth/session" && req.method === "GET")
-      return reply(res, 200, { user: publicUser(db, user, user?.id) });
+      return reply(res, 200, {
+        user: await publicUser(db, user, user?.id),
+      });
     if (path === "/api/auth/register" && req.method === "POST") {
-      const account = register(db, await readJson(req));
-      const session = createSession(db, account.id);
+      const input = await readJson(req);
+      const { account, session } = await db.transaction(async (tx) => {
+        const account = await register(tx, input);
+        return { account, session: await createSession(tx, account.id) };
+      });
       return reply(
         res,
         201,
-        { user: publicUser(db, account, account.id) },
-        { "Set-Cookie": sessionCookie(session.token, session.expiresAt) },
+        {
+          user: await publicUser(db, account, account.id),
+        },
+        {
+          "Set-Cookie": sessionCookie(session.token, session.expiresAt),
+        },
       );
     }
     if (path === "/api/auth/login" && req.method === "POST") {
-      const account = login(db, await readJson(req));
-      const session = createSession(db, account.id);
+      const account = await login(db, await readJson(req));
+      const session = await createSession(db, account.id);
       return reply(
         res,
         200,
-        { user: publicUser(db, account, account.id) },
-        { "Set-Cookie": sessionCookie(session.token, session.expiresAt) },
+        {
+          user: await publicUser(db, account, account.id),
+        },
+        {
+          "Set-Cookie": sessionCookie(session.token, session.expiresAt),
+        },
       );
     }
     if (path === "/api/auth/logout" && req.method === "POST")
       return reply(res, 204, null, {
-        "Set-Cookie": clearSession(db, req.headers.cookie),
+        "Set-Cookie": await clearSession(db, req.headers.cookie),
       });
     if (path === "/api/projects" && req.method === "GET") {
       const query = (url.searchParams.get("q") ?? "").trim();
       const rows = query
-        ? db
+        ? await db
             .prepare(
-              "SELECT * FROM projects WHERE name LIKE ? OR description LIKE ? ORDER BY updated_at DESC",
+              "SELECT * FROM projects WHERE lower(name) LIKE lower(?) OR lower(description) LIKE lower(?) ORDER BY updated_at DESC",
             )
             .all(`%${query}%`, `%${query}%`)
-        : db.prepare("SELECT * FROM projects ORDER BY updated_at DESC").all();
+        : await db
+            .prepare("SELECT * FROM projects ORDER BY updated_at DESC")
+            .all();
       return reply(res, 200, {
-        projects: rows
-          .map((row) => publicProject(db, row, user?.id))
-          .filter(Boolean),
+        projects: (
+          await Promise.all(
+            rows.map(async (row) => await publicProject(db, row, user?.id)),
+          )
+        ).filter(Boolean),
       });
     }
     if (path === "/api/projects" && req.method === "POST") {
       requireUser(user);
       const input = await readJson(req);
       if (input.importId) {
-        const preview = db
+        const preview = await db
           .prepare(
             "SELECT metadata_json FROM project_imports WHERE id=? AND user_id=? AND expires_at>?",
           )
@@ -228,35 +297,37 @@ const server = http.createServer(async (req, res) => {
             github_repository_id: metadata.github.id,
           });
           metadata.github.private = !!access.repo.private;
-          db.prepare(
-            "UPDATE project_imports SET metadata_json=? WHERE id=?",
-          ).run(JSON.stringify(metadata), input.importId);
+          await db
+            .prepare("UPDATE project_imports SET metadata_json=? WHERE id=?")
+            .run(JSON.stringify(metadata), input.importId);
         }
       }
-      const project = createProject(db, user, input);
-      return reply(res, 201, { project: publicProject(db, project, user.id) });
+      const project = await createProject(db, user, input);
+      return reply(res, 201, {
+        project: await publicProject(db, project, user.id),
+      });
     }
     const detail = path.match(/^\/api\/projects\/([^/]+)$/);
     if (detail && req.method === "DELETE") {
-      deleteProject(db, requireUser(user), decodeURIComponent(detail[1]));
+      await deleteProject(db, requireUser(user), decodeURIComponent(detail[1]));
       return reply(res, 204);
     }
     if (detail && req.method === "GET") {
-      const project = db
+      const project = await db
         .prepare("SELECT * FROM projects WHERE id = ?")
         .get(decodeURIComponent(detail[1]));
       if (!project) throw new ApiError(404, "Projeto não encontrado.");
       if (project.github_private && project.owner_id !== user?.id)
         await github.authorize(requireUser(user), project);
       return reply(res, 200, {
-        project: publicProject(db, project, user?.id, true),
+        project: await publicProject(db, project, user?.id, true),
       });
     }
     const projectAction = path.match(
       /^\/api\/projects\/([^/]+)\/(like|favorite|commits)$/,
     );
     if (projectAction) {
-      const project = db
+      const project = await db
         .prepare("SELECT * FROM projects WHERE id = ?")
         .get(decodeURIComponent(projectAction[1]));
       if (!project) throw new ApiError(404, "Projeto não encontrado.");
@@ -275,7 +346,7 @@ const server = http.createServer(async (req, res) => {
       const account = requireUser(user);
       if (!["POST", "DELETE"].includes(req.method))
         throw new ApiError(405, "Método não permitido.");
-      setRelation(
+      await setRelation(
         db,
         action === "like" ? "project_likes" : "favorites",
         ["user_id", "project_id"],
@@ -283,39 +354,52 @@ const server = http.createServer(async (req, res) => {
         req.method === "POST",
       );
       return reply(res, 200, {
-        project: publicProject(db, project, account.id),
+        project: await publicProject(db, project, account.id),
       });
     }
     if (path === "/api/favorites" && req.method === "GET") {
-      if (!user) return reply(res, 200, { projects: [] });
-      const rows = db
+      if (!user)
+        return reply(res, 200, {
+          projects: [],
+        });
+      const rows = await db
         .prepare(
           "SELECT projects.* FROM favorites JOIN projects ON projects.id = favorites.project_id WHERE favorites.user_id = ? ORDER BY favorites.created_at DESC",
         )
         .all(user.id);
       return reply(res, 200, {
-        projects: rows
-          .map((row) => publicProject(db, row, user.id))
-          .filter(Boolean),
+        projects: (
+          await Promise.all(
+            rows.map(async (row) => await publicProject(db, row, user.id)),
+          )
+        ).filter(Boolean),
       });
     }
     if (path === "/api/progress" && req.method === "GET") {
       const account = requireUser(user);
-      const rows = db
+      const rows = await db
         .prepare(
           "SELECT * FROM projects WHERE owner_id = ? AND github_integration_enabled=1 ORDER BY updated_at DESC",
         )
         .all(account.id);
       return reply(res, 200, {
-        projects: rows.map((row) => publicProject(db, row, account.id)),
-        favorites: db
-          .prepare("SELECT COUNT(*) AS count FROM favorites WHERE user_id = ?")
-          .get(account.id).count,
-        following: db
-          .prepare(
-            "SELECT COUNT(*) AS count FROM follows WHERE follower_id = ?",
-          )
-          .get(account.id).count,
+        projects: await Promise.all(
+          rows.map(async (row) => await publicProject(db, row, account.id)),
+        ),
+        favorites: (
+          await db
+            .prepare(
+              "SELECT COUNT(*) AS count FROM favorites WHERE user_id = ?",
+            )
+            .get(account.id)
+        ).count,
+        following: (
+          await db
+            .prepare(
+              "SELECT COUNT(*) AS count FROM follows WHERE follower_id = ?",
+            )
+            .get(account.id)
+        ).count,
       });
     }
     if (path === "/api/rankings/featured" && req.method === "GET") {
@@ -323,29 +407,35 @@ const server = http.createServer(async (req, res) => {
       if (!["week", "month", "all"].includes(period))
         throw new ApiError(422, "Período inválido.");
       return reply(res, 200, {
-        projects: rankingProjects(db, user?.id, period),
+        projects: await rankingProjects(db, user?.id, period),
       });
     }
     if (path === "/api/users" && req.method === "GET") {
       const query = (url.searchParams.get("q") ?? "").trim();
       const rows = query
-        ? db
+        ? await db
             .prepare(
-              "SELECT * FROM users WHERE name LIKE ? OR bio LIKE ? OR username LIKE ? ORDER BY name",
+              "SELECT * FROM users WHERE lower(name) LIKE lower(?) OR lower(bio) LIKE lower(?) OR lower(username) LIKE lower(?) ORDER BY name",
             )
             .all(`%${query}%`, `%${query}%`, `%${query}%`)
-        : db.prepare("SELECT * FROM users ORDER BY name").all();
+        : await db.prepare("SELECT * FROM users ORDER BY name").all();
       return reply(res, 200, {
-        users: rows.map((row) => publicUser(db, row, user?.id)),
+        users: await Promise.all(
+          rows.map(async (row) => await publicUser(db, row, user?.id)),
+        ),
       });
     }
     if (path === "/api/account/privacy" && req.method === "PATCH")
       return reply(res, 200, {
-        privacy: updatePrivacy(db, requireUser(user), await readJson(req)),
+        privacy: await updatePrivacy(
+          db,
+          requireUser(user),
+          await readJson(req),
+        ),
       });
     if (path === "/api/account/profile" && req.method === "PATCH")
       return reply(res, 200, {
-        user: updateProfile(db, requireUser(user), await readJson(req)),
+        user: await updateProfile(db, requireUser(user), await readJson(req)),
       });
     const section = path.match(
       /^\/api\/users\/([^/]+)\/(projects|followers|following|friends|likes|favorites)$/,
@@ -354,7 +444,7 @@ const server = http.createServer(async (req, res) => {
       return reply(
         res,
         200,
-        profileSection(
+        await profileSection(
           db,
           decodeURIComponent(section[1]),
           section[2],
@@ -363,11 +453,13 @@ const server = http.createServer(async (req, res) => {
       );
     const userDetail = path.match(/^\/api\/users\/([^/]+)$/);
     if (userDetail && req.method === "GET") {
-      const found = db
+      const found = await db
         .prepare("SELECT * FROM users WHERE id = ?")
         .get(decodeURIComponent(userDetail[1]));
       if (!found) throw new ApiError(404, "Usuário não encontrado.");
-      return reply(res, 200, { user: publicUser(db, found, user?.id) });
+      return reply(res, 200, {
+        user: await publicUser(db, found, user?.id),
+      });
     }
     const follow = path.match(/^\/api\/users\/([^/]+)\/follow$/);
     if (follow) {
@@ -375,18 +467,20 @@ const server = http.createServer(async (req, res) => {
         target = decodeURIComponent(follow[1]);
       if (account.id === target)
         throw new ApiError(422, "Você não pode seguir a própria conta.");
-      if (!db.prepare("SELECT 1 FROM users WHERE id = ?").get(target))
+      if (!(await db.prepare("SELECT 1 FROM users WHERE id = ?").get(target)))
         throw new ApiError(404, "Usuário não encontrado.");
       if (!["POST", "DELETE"].includes(req.method))
         throw new ApiError(405, "Método não permitido.");
-      setRelation(
+      await setRelation(
         db,
         "follows",
         ["follower_id", "followed_id"],
         [account.id, target],
         req.method === "POST",
       );
-      return reply(res, 200, { following: req.method === "POST" });
+      return reply(res, 200, {
+        following: req.method === "POST",
+      });
     }
     if (path.startsWith("/api/"))
       throw new ApiError(404, "Endpoint não encontrado.");
@@ -399,7 +493,9 @@ const server = http.createServer(async (req, res) => {
         ? requested
         : join(dist, "index.html");
     if (!existsSync(file)) {
-      res.writeHead(503, { "Content-Type": "text/plain; charset=utf-8" });
+      res.writeHead(503, {
+        "Content-Type": "text/plain; charset=utf-8",
+      });
       return res.end("Execute npm run build antes de iniciar o servidor.");
     }
     res.writeHead(200, {
@@ -420,3 +516,11 @@ server.listen(Number(process.env.PORT ?? 3000), () =>
     `Orbitfolio disponível em http://localhost:${process.env.PORT ?? 3000}`,
   ),
 );
+
+for (const signal of ["SIGTERM", "SIGINT"])
+  process.once(signal, () => {
+    server.close(async () => {
+      await db.close();
+      process.exit(0);
+    });
+  });

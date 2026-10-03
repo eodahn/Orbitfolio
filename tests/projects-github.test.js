@@ -27,11 +27,16 @@ import {
   repositoryPath,
 } from "../server/github.js";
 import { framingDistance } from "../src/three/preview.js";
-const account = (db, name) =>
-  register(db, {
+const account = async (db, name) =>
+  await register(db, {
     name,
     email: name + "@test.local",
     password: "test-password",
+    username: (name + "@test.local")
+      .split("@")[0]
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "-")
+      .padEnd(3, "x"),
   });
 const env = {
   APP_ORIGIN: "http://localhost:5173",
@@ -44,95 +49,151 @@ const repo = {
   name: "hello",
   full_name: "owner/hello",
   html_url: "https://github.com/owner/hello",
-  owner: { login: "owner" },
+  owner: {
+    login: "owner",
+  },
   private: true,
   size: 2048,
   default_branch: "main",
   description: "Repository test",
 };
 const response = (body, status = 200, headers = {}) =>
-  new Response(JSON.stringify(body), { status, headers });
-test("manual projects persist optional percentages and stable positions; delete is owner-only and cascades", () => {
+  new Response(JSON.stringify(body), {
+    status,
+    headers,
+  });
+test("manual projects persist optional percentages and stable positions; delete is owner-only and cascades", async () => {
   const directory = mkdtempSync(join(tmpdir(), "orbit-db-")),
     file = join(directory, "db.sqlite");
   let db = openDatabase(file);
   try {
-    const a = account(db, "Alice"),
-      b = account(db, "Bruno");
-    const p = createProject(db, a, {
+    const a = await account(db, "Alice"),
+      b = await account(db, "Bruno");
+    const p = await createProject(db, a, {
       name: "Manual test",
       demoUrl: "https://example.com/project",
-      languages: { JavaScript: null, CSS: 30 },
+      languages: {
+        JavaScript: null,
+        CSS: 30,
+      },
       description: "",
     });
-    const view = publicProject(db, p, a.id);
+    const view = await publicProject(db, p, a.id);
     assert.equal(view.description, "");
     assert.equal(view.languages.JavaScript, null);
     assert.equal(view.languages.CSS, 30);
     assert.equal(view.orbit.length, 3);
     for (const table of ["favorites", "project_likes"])
-      setRelation(db, table, ["user_id", "project_id"], [b.id, p.id], true);
-    assert.throws(
-      () => deleteProject(db, b, p.id),
+      await setRelation(
+        db,
+        table,
+        ["user_id", "project_id"],
+        [b.id, p.id],
+        true,
+      );
+    await assert.rejects(
+      async () => await deleteProject(db, b, p.id),
       (e) => e.status === 403,
     );
-    assert.throws(
-      () => deleteProject(db, null, p.id),
+    await assert.rejects(
+      async () => await deleteProject(db, null, p.id),
       (e) => e.status === 401,
     );
     db.close();
     db = openDatabase(file);
-    ensureOrbits(db);
+    await ensureOrbits(db);
     assert.deepEqual(
-      publicProject(
-        db,
-        db.prepare("SELECT * FROM projects WHERE id=?").get(p.id),
-        a.id,
+      (
+        await publicProject(
+          db,
+          await db.prepare("SELECT * FROM projects WHERE id=?").get(p.id),
+          a.id,
+        )
       ).orbit,
       view.orbit,
     );
-    createProject(db, a, {
+    await createProject(db, a, {
       name: "Another planet",
       demoUrl: "https://example.com/project",
       languages: {},
     });
-    ensureOrbits(db);
+    await ensureOrbits(db);
     assert.deepEqual(
-      publicProject(
-        db,
-        db.prepare("SELECT * FROM projects WHERE id=?").get(p.id),
-        a.id,
+      (
+        await publicProject(
+          db,
+          await db.prepare("SELECT * FROM projects WHERE id=?").get(p.id),
+          a.id,
+        )
       ).orbit,
       view.orbit,
     );
-    deleteProject(db, a, p.id);
-    assert.equal(db.prepare("SELECT COUNT(*) n FROM favorites").get().n, 0);
-    assert.equal(db.prepare("SELECT COUNT(*) n FROM project_likes").get().n, 0);
-    assert.equal(db.prepare("SELECT COUNT(*) n FROM commits").get().n, 0);
+    await deleteProject(db, a, p.id);
+    assert.equal(
+      (await db.prepare("SELECT COUNT(*) n FROM favorites").get()).n,
+      0,
+    );
+    assert.equal(
+      (await db.prepare("SELECT COUNT(*) n FROM project_likes").get()).n,
+      0,
+    );
+    assert.equal(
+      (await db.prepare("SELECT COUNT(*) n FROM commits").get()).n,
+      0,
+    );
   } finally {
     db.close();
-    rmSync(directory, { recursive: true });
+    rmSync(directory, {
+      recursive: true,
+    });
   }
 });
 test("language validation and GitHub byte mapping", () => {
-  assert.deepEqual(normalizeLanguages({ JS: null, CSS: "" }), {
-    JS: null,
-    CSS: null,
+  assert.deepEqual(
+    normalizeLanguages({
+      JS: null,
+      CSS: "",
+    }),
+    {
+      JS: null,
+      CSS: null,
+    },
+  );
+  assert.throws(
+    () =>
+      normalizeLanguages({
+        JS: 80,
+        CSS: 30,
+      }),
+    (e) => e.status === 422,
+  );
+  assert.throws(
+    () =>
+      normalizeLanguages({
+        JS: 20,
+        CSS: 30,
+      }),
+    (e) => e.status === 422,
+  );
+  assert.throws(
+    () =>
+      normalizeLanguages({
+        JS: -1,
+      }),
+    (e) => e.status === 422,
+  );
+  const mapped = mapRepository(
+    repo,
+    {
+      JS: 600,
+      CSS: 400,
+    },
+    false,
+  );
+  assert.deepEqual(mapped.languages, {
+    JS: 60,
+    CSS: 40,
   });
-  assert.throws(
-    () => normalizeLanguages({ JS: 80, CSS: 30 }),
-    (e) => e.status === 422,
-  );
-  assert.throws(
-    () => normalizeLanguages({ JS: 20, CSS: 30 }),
-    (e) => e.status === 422,
-  );
-  assert.throws(
-    () => normalizeLanguages({ JS: -1 }),
-    (e) => e.status === 422,
-  );
-  const mapped = mapRepository(repo, { JS: 600, CSS: 400 }, false);
-  assert.deepEqual(mapped.languages, { JS: 60, CSS: 40 });
   assert.equal(mapped.sizeBytes, 2097152);
   assert.equal(mapped.github.integrationEnabled, false);
   assert.throws(
@@ -142,8 +203,8 @@ test("language validation and GitHub byte mapping", () => {
 });
 test("OAuth state is bound to session, one-use and expires; tokens encrypted with per-user AAD", async () => {
   const db = openDatabase(":memory:"),
-    user = account(db, "Alice"),
-    session = createSession(db, user.id),
+    user = await account(db, "Alice"),
+    session = await createSession(db, user.id),
     cookies = "orbitfolio_session=" + session.token;
   const calls = [];
   const service = createGithubService(db, {
@@ -151,7 +212,9 @@ test("OAuth state is bound to session, one-use and expires; tokens encrypted wit
     fetcher: async (url, options) => {
       calls.push([url, options]);
       return url.includes("access_token")
-        ? response({ access_token: "credential-example" })
+        ? response({
+            access_token: "credential-example",
+          })
         : response({
             id: 99,
             login: "alice",
@@ -162,10 +225,14 @@ test("OAuth state is bound to session, one-use and expires; tokens encrypted wit
     },
   });
   assert.equal(
-    createGithubService(db, { env: {} }).status(user).available,
+    (
+      await createGithubService(db, {
+        env: {},
+      }).status(user)
+    ).available,
     false,
   );
-  const url = new URL(service.connect(user, cookies).url),
+  const url = new URL((await service.connect(user, cookies)).url),
     query = new URLSearchParams({
       state: url.searchParams.get("state"),
       code: "test-code",
@@ -177,7 +244,7 @@ test("OAuth state is bound to session, one-use and expires; tokens encrypted wit
   );
   await service.callback(user, cookies, query);
   assert.equal(calls.length, 2);
-  assert.deepEqual(service.status(user).account, {
+  assert.deepEqual((await service.status(user)).account, {
     id: 99,
     login: "alice",
     name: "Alice",
@@ -185,13 +252,15 @@ test("OAuth state is bound to session, one-use and expires; tokens encrypted wit
     profileUrl: "https://github.com/alice",
   });
   assert.equal(
-    JSON.stringify(service.status(user)).includes("credential-example"),
+    JSON.stringify(await service.status(user)).includes("credential-example"),
     false,
   );
   assert.ok(JSON.parse(calls[0][1].body).code_verifier);
-  const encrypted = db
-    .prepare("SELECT encrypted_token FROM github_connections WHERE user_id=?")
-    .get(user.id).encrypted_token;
+  const encrypted = (
+    await db
+      .prepare("SELECT encrypted_token FROM github_connections WHERE user_id=?")
+      .get(user.id)
+  ).encrypted_token;
   assert.ok(!encrypted.includes("credential-example"));
   assert.equal(
     decryptToken(encrypted, user.id, githubConfig(env)),
@@ -202,8 +271,8 @@ test("OAuth state is bound to session, one-use and expires; tokens encrypted wit
     () => service.callback(user, cookies, query),
     (e) => e.status === 403,
   );
-  const next = new URL(service.connect(user, cookies).url);
-  db.prepare("UPDATE github_oauth_states SET expires_at=0").run();
+  const next = new URL((await service.connect(user, cookies)).url);
+  await db.prepare("UPDATE github_oauth_states SET expires_at=0").run();
   await assert.rejects(
     () =>
       service.callback(
@@ -220,18 +289,20 @@ test("OAuth state is bound to session, one-use and expires; tokens encrypted wit
 });
 test("private repository access uses viewer token, prevents public leaks, and real commit mapping uses tag or SHA", async () => {
   const db = openDatabase(":memory:"),
-    a = account(db, "Alice"),
-    b = account(db, "Bruno"),
+    a = await account(db, "Alice"),
+    b = await account(db, "Bruno"),
     config = githubConfig(env);
   for (const user of [a, b])
-    db.prepare(
-      "INSERT INTO github_connections(user_id,github_user_id,github_login,encrypted_token) VALUES(?,?,?,?)",
-    ).run(
-      user.id,
-      user === a ? 1 : 2,
-      user.name,
-      encryptToken(user.name, user.id, config),
-    );
+    await db
+      .prepare(
+        "INSERT INTO github_connections(user_id,github_user_id,github_login,encrypted_token) VALUES(?,?,?,?)",
+      )
+      .run(
+        user.id,
+        user === a ? 1 : 2,
+        user.name,
+        encryptToken(user.name, user.id, config),
+      );
   const calls = [];
   const service = createGithubService(db, {
     env,
@@ -239,7 +310,11 @@ test("private repository access uses viewer token, prevents public leaks, and re
       calls.push(options.headers.Authorization);
       if (options.headers.Authorization === "Bearer Bruno")
         return response({}, 404);
-      if (url.includes("/languages")) return response({ JS: 600, CSS: 400 });
+      if (url.includes("/languages"))
+        return response({
+          JS: 600,
+          CSS: 400,
+        });
       if (url.includes("/commits?"))
         return response(
           [
@@ -247,25 +322,42 @@ test("private repository access uses viewer token, prevents public leaks, and re
               sha: "abcdef123456",
               commit: {
                 message: "Ship new feature",
-                author: { name: "Alice", date: "2026-09-25T12:00:00Z" },
+                author: {
+                  name: "Alice",
+                  date: "2026-09-25T12:00:00Z",
+                },
               },
               html_url: "https://github.com/owner/hello/commit/abcdef123456",
-              author: { avatar_url: "" },
+              author: {
+                avatar_url: "",
+              },
             },
             {
               sha: "7654321abcde",
               commit: {
                 message: "Second commit",
-                author: { name: "Alice", date: "2026-09-24T12:00:00Z" },
+                author: {
+                  name: "Alice",
+                  date: "2026-09-24T12:00:00Z",
+                },
               },
               html_url: "https://github.com/owner/hello/commit/7654321abcde",
             },
           ],
           200,
-          { link: '<https://api.github.com/next>; rel="next"' },
+          {
+            link: '<https://api.github.com/next>; rel="next"',
+          },
         );
       if (url.includes("/tags?"))
-        return response([{ name: "v1.0.0", commit: { sha: "abcdef123456" } }]);
+        return response([
+          {
+            name: "v1.0.0",
+            commit: {
+              sha: "abcdef123456",
+            },
+          },
+        ]);
       return response(repo);
     },
   });
@@ -273,19 +365,21 @@ test("private repository access uses viewer token, prevents public leaks, and re
     fullName: "owner/hello",
     integrated: true,
   });
-  const p = createProject(db, a, {
+  const p = await createProject(db, a, {
     importId: draft.importId,
     name: draft.name,
     description: draft.description,
     languages: draft.languages,
   });
-  assert.equal(publicProject(db, p, b.id), null);
-  assert.equal(publicProject(db, p, a.id).github.private, true);
-  assert.throws(
-    () =>
-      createProject(db, b, {
+  assert.equal(await publicProject(db, p, b.id), null);
+  assert.equal((await publicProject(db, p, a.id)).github.private, true);
+  await assert.rejects(
+    async () =>
+      await createProject(db, b, {
         name: "Spoofed",
-        github: { integrationEnabled: true },
+        github: {
+          integrationEnabled: true,
+        },
       }),
     (e) => e.status === 422,
   );
@@ -299,7 +393,11 @@ test("private repository access uses viewer token, prevents public leaks, and re
   );
   assert.equal(calls.at(-1), "Bearer Bruno");
   await assert.rejects(
-    () => service.inspect(a, { fullName: "owner/hello", integrated: false }),
+    () =>
+      service.inspect(a, {
+        fullName: "owner/hello",
+        integrated: false,
+      }),
     (e) => e.status === 403,
   );
   db.close();
@@ -308,23 +406,41 @@ test("GitHub errors are sanitized and rate-limit distinguished", async () => {
   for (const [status, headers, expected] of [
     [401, {}, 401],
     [403, {}, 403],
-    [403, { "x-github-sso": "required" }, 403],
+    [
+      403,
+      {
+        "x-github-sso": "required",
+      },
+      403,
+    ],
     [429, {}, 429],
     [404, {}, 404],
-    [403, { "x-ratelimit-remaining": "0" }, 429],
+    [
+      403,
+      {
+        "x-ratelimit-remaining": "0",
+      },
+      429,
+    ],
     [500, {}, 502],
   ])
     await assert.rejects(
-      () =>
-        githubRequest("/repos/a/b", {
+      async () =>
+        await githubRequest("/repos/a/b", {
           fetcher: async () =>
-            response({ message: "sensitive remote text" }, status, headers),
+            response(
+              {
+                message: "sensitive remote text",
+              },
+              status,
+              headers,
+            ),
         }),
       (e) => e.status === expected && !e.message.includes("sensitive"),
     );
   await assert.rejects(
-    () =>
-      githubRequest("/repos/a/b", {
+    async () =>
+      await githubRequest("/repos/a/b", {
         fetcher: async () => {
           throw Error("secret");
         },
@@ -341,7 +457,6 @@ test("camera framing contains small and large spheres in portrait and landscape"
       assert.ok(angle < Math.atan(Math.tan((58 * Math.PI) / 360) * aspect));
     }
 });
-
 test("repository redirects retain authorization only on GitHub API", async () => {
   const calls = [];
   const result = await githubRequest("/repos/old/name", {
@@ -352,52 +467,65 @@ test("repository redirects retain authorization only on GitHub API", async () =>
         ? response({}, 301, {
             location: "https://api.github.com/repos/new/name",
           })
-        : response({ id: 1 });
+        : response({
+            id: 1,
+          });
     },
   });
   assert.equal(result.data.id, 1);
   assert.equal(calls[1][1], "Bearer fixture");
   let count = 0;
   await assert.rejects(
-    () =>
-      githubRequest("/repos/a/b", {
+    async () =>
+      await githubRequest("/repos/a/b", {
         token: "fixture",
         fetcher: async () => {
           count++;
-          return response({}, 301, { location: "https://example.com/steal" });
+          return response({}, 301, {
+            location: "https://example.com/steal",
+          });
         },
       }),
     (e) => e.status === 503,
   );
   assert.equal(count, 1);
 });
-
 test("OAuth callback distinguishes invalid code, rate limit and unavailable upstream", async () => {
   for (const [status, payload, expected] of [
-    [200, { error: "bad_verification_code" }, "invalid_code"],
+    [
+      200,
+      {
+        error: "bad_verification_code",
+      },
+      "invalid_code",
+    ],
     [429, {}, "rate_limit"],
     [500, {}, "unavailable"],
   ]) {
     const db = openDatabase(":memory:"),
-      user = account(db, "Alice");
-    const cookies = "orbitfolio_session=" + createSession(db, user.id).token;
+      user = await account(db, "Alice");
+    const cookies =
+      "orbitfolio_session=" + (await createSession(db, user.id)).token;
     const service = createGithubService(db, {
       env,
       fetcher: async () => response(payload, status),
     });
-    const state = new URL(service.connect(user, cookies).url).searchParams.get(
-      "state",
-    );
+    const state = new URL(
+      (await service.connect(user, cookies)).url,
+    ).searchParams.get("state");
     await assert.rejects(
       () =>
         service.callback(
           user,
           cookies,
-          new URLSearchParams({ state, code: "fixture" }),
+          new URLSearchParams({
+            state,
+            code: "fixture",
+          }),
         ),
       (error) => error.code === expected,
     );
-    assert.equal(service.status(user).connected, false);
+    assert.equal((await service.status(user)).connected, false);
     db.close();
   }
 });

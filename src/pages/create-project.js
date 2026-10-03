@@ -1,3 +1,4 @@
+import { bindCharacterCounts } from "../components/character-count.js";
 import { oauthMessages } from "../../shared/oauth-errors.js";
 import { chooseLanguage } from "../components/language-picker.js";
 import {
@@ -19,6 +20,7 @@ export async function renderCreateProject(root) {
       `<main class="page narrow create-page"><p class="eyebrow">UM NOVO PLANETA</p><h1>Adicionar projeto</h1><div class="creation-content">${body}</div><p data-create-error class="form-error" role="alert"></p></main>`,
       "/projects",
     );
+    bindCharacterCounts(root);
   };
   const error = (err) => {
     const el = root.querySelector("[data-create-error]");
@@ -145,7 +147,7 @@ export async function renderCreateProject(root) {
   function editor() {
     const links = projectLinks(draft);
     frame(
-      `<h2>${draft.importId ? "Revise seu projeto" : "Personalizar projeto"}</h2>${draft.github?.private ? '<p class="notice">Repositório privado: este projeto não será exibido publicamente. Os commits exigem acesso GitHub autorizado.</p>' : ""}<form class="profile-form project-form" data-project-form><label>Nome do projeto<input name="name" required minlength="2" maxlength="100" value="${e(draft.name)}"></label><label>Descrição<textarea name="description" maxlength="500">${e(draft.description)}</textarea></label><label>Repositório GitHub<input name="githubUrl" type="url" value="${e(links.github)}" ${draft.importId ? "readonly" : ""} placeholder="https://github.com/usuario/repositorio"></label><label>Link externo do projeto<input name="demoUrl" type="url" value="${e(links.external)}" placeholder="https://meu-projeto.com"></label><p>Adicione pelo menos um dos links.</p><fieldset><legend>Linguagens</legend><p>Porcentagens são opcionais. Quando todas forem preenchidas, devem somar 100%.</p><table class="language-table"><thead><tr><th>Linguagem</th><th>% (opcional)</th><th>Ações</th></tr></thead><tbody data-language-rows></tbody></table><button type="button" class="button" data-add-language>+ Adicionar linguagem</button></fieldset><div class="actions"><button class="button button-primary" type="submit">Criar projeto</button><button class="button" type="button" data-back>Voltar</button></div></form>`,
+      `<h2>${draft.importId ? "Revise seu projeto" : "Personalizar projeto"}</h2>${draft.github?.private ? '<p class="notice">Repositório privado: este projeto não será exibido publicamente. Os commits exigem acesso GitHub autorizado.</p>' : ""}<form class="profile-form project-form" data-project-form><label>Nome do projeto<input name="name" required minlength="2" maxlength="50" value="${e(draft.name)}"></label><label>Descrição<textarea name="description" maxlength="350">${e(draft.description)}</textarea></label><label>Repositório GitHub<input name="githubUrl" type="url" value="${e(links.github)}" ${draft.importId ? "readonly" : ""} placeholder="https://github.com/usuario/repositorio"></label><label>Link externo do projeto<input name="demoUrl" type="url" value="${e(links.external)}" placeholder="https://meu-projeto.com"></label><p>Adicione pelo menos um dos links.</p><fieldset><legend>Linguagens</legend><p>Porcentagens são opcionais. Quando todas forem preenchidas, devem somar 100%.</p><table class="language-table"><thead><tr><th>Linguagem</th><th>% (opcional)</th><th>Ações</th></tr></thead><tbody data-language-rows></tbody></table><button type="button" class="button" data-add-language>+ Adicionar linguagem</button></fieldset><div class="actions"><button class="button button-primary" type="submit">Criar projeto</button><button class="button" type="button" data-back>Voltar</button></div></form>`,
     );
     const rows = root.querySelector("[data-language-rows]");
     const add = (name = "", value = null) => {

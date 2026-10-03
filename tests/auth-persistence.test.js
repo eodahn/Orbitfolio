@@ -9,7 +9,7 @@ import { githubConfig, createGithubService } from "../server/github.js";
 import { openDatabase } from "../server/db.js";
 import { register, login } from "../server/app.js";
 const url = (path) => new URL(path, import.meta.url).href;
-test("accounts survive separate server processes, expired sessions and a consistent backup", () => {
+test("accounts survive separate server processes, expired sessions and a consistent backup", async () => {
   const dir = mkdtempSync(join(tmpdir(), "orbit-persist-")),
     file = join(dir, "nested", "db.sqlite");
   const env = {
@@ -23,24 +23,28 @@ test("accounts survive separate server processes, expired sessions and a consist
       [
         "--input-type=module",
         "-e",
-        `import {openDatabase} from ${JSON.stringify(url("../server/db.js"))};import {register,login,createSession,sessionUser} from ${JSON.stringify(url("../server/app.js"))}; const db=openDatabase();${code};db.close();`,
+        `import {openDatabase} from ${JSON.stringify(url("../server/db.js"))};import {register,login,createSession,sessionUser} from ${JSON.stringify(url("../server/app.js"))}; const db=openDatabase();${code};await db.close();`,
       ],
-      { env, cwd: dir, encoding: "utf8" },
+      {
+        env,
+        cwd: dir,
+        encoding: "utf8",
+      },
     ).trim();
   try {
     const id = run(
-      `const u=register(db,{name:'Conta permanente',email:'remember@test.local',password:'test-password'});createSession(db,u.id);console.log(u.id)`,
+      `const u=await register(db,{name:'Conta permanente',username:'permanente',email:'remember@test.local',password:'test-password'});await createSession(db,u.id);console.log(u.id)`,
     );
     assert.ok(existsSync(file));
     assert.equal(
       run(
-        `console.log(login(db,{email:' REMEMBER@test.local ',password:'test-password'}).id)`,
+        `console.log((await login(db,{email:' REMEMBER@test.local ',password:'test-password'})).id)`,
       ),
       id,
     );
     assert.equal(
       run(
-        `db.prepare("UPDATE sessions SET expires_at='2000-01-01'").run();console.log(login(db,{email:'remember@test.local',password:'test-password'}).id)`,
+        `await db.prepare("UPDATE sessions SET expires_at='2000-01-01'").run();console.log((await login(db,{email:'remember@test.local',password:'test-password'})).id)`,
       ),
       id,
     );
@@ -51,12 +55,18 @@ test("accounts survive separate server processes, expired sessions and a consist
         new URL("../scripts/backup-database.mjs", import.meta.url).pathname,
         target,
       ],
-      { env },
+      {
+        env,
+      },
     );
     const backup = openDatabase(target);
     assert.equal(
-      login(backup, { email: "remember@test.local", password: "test-password" })
-        .id,
+      (
+        await login(backup, {
+          email: "remember@test.local",
+          password: "test-password",
+        })
+      ).id,
       id,
     );
     backup.close();
@@ -67,7 +77,10 @@ test("accounts survive separate server processes, expired sessions and a consist
           new URL("../scripts/backup-database.mjs", import.meta.url).pathname,
           target,
         ],
-        { env, stdio: "pipe" },
+        {
+          env,
+          stdio: "pipe",
+        },
       ),
     );
     assert.throws(
@@ -79,38 +92,55 @@ test("accounts survive separate server processes, expired sessions and a consist
     );
     assert.equal(existsSync(join(dir, "absent.sqlite")), false);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(dir, {
+      recursive: true,
+      force: true,
+    });
   }
 });
-test("invalid login stays 401 including malformed stored hashes; never bypasses authentication", () => {
+test("invalid login stays 401 including malformed stored hashes; never bypasses authentication", async () => {
   const db = openDatabase(":memory:");
   try {
-    const user = register(db, {
+    const user = await register(db, {
       name: "Login test",
       email: "login@test.local",
       password: "test-password",
+      username: "login@test.local"
+        .split("@")[0]
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, "-")
+        .padEnd(3, "x"),
     });
     for (const input of [
-      { email: "missing@test.local", password: "test-password" },
-      { email: "login@test.local", password: "incorrect" },
+      {
+        email: "missing@test.local",
+        password: "test-password",
+      },
+      {
+        email: "login@test.local",
+        password: "incorrect",
+      },
     ])
-      assert.throws(
-        () => login(db, input),
+      await assert.rejects(
+        async () => await login(db, input),
         (e) => e.status === 401,
       );
-    db.prepare("UPDATE users SET password_hash=? WHERE id=?").run(
-      "invalid",
-      user.id,
-    );
-    assert.throws(
-      () => login(db, { email: "login@test.local", password: "test-password" }),
+    await db
+      .prepare("UPDATE users SET password_hash=? WHERE id=?")
+      .run("invalid", user.id);
+    await assert.rejects(
+      async () =>
+        await login(db, {
+          email: "login@test.local",
+          password: "test-password",
+        }),
       (e) => e.status === 401,
     );
   } finally {
     db.close();
   }
 });
-test("OAuth normalizes configured origins and reports only configuration names", () => {
+test("OAuth normalizes configured origins and reports only configuration names", async () => {
   const env = {
     APP_ORIGIN: " https://orbitfolio.onrender.com/ ",
     GITHUB_CLIENT_ID: " id ",
@@ -130,19 +160,28 @@ test("OAuth normalizes configured origins and reports only configuration names",
     true,
   );
   assert.equal(
-    githubConfig({ ...env, APP_ORIGIN: "https://user:password@example.com" })
-      .enabled,
+    githubConfig({
+      ...env,
+      APP_ORIGIN: "https://user:password@example.com",
+    }).enabled,
     false,
   );
   const db = openDatabase(":memory:");
   try {
-    const user = register(db, {
+    const user = await register(db, {
       name: "OAuth test",
       email: "oauth@test.local",
       password: "test-password",
+      username: "oauth@test.local"
+        .split("@")[0]
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, "-")
+        .padEnd(3, "x"),
     });
-    const status = createGithubService(db, {
-      env: { APP_ORIGIN: env.APP_ORIGIN },
+    const status = await createGithubService(db, {
+      env: {
+        APP_ORIGIN: env.APP_ORIGIN,
+      },
     }).status(user);
     assert.deepEqual(status.configurationIssues, [
       "GITHUB_CLIENT_ID",

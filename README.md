@@ -1,6 +1,6 @@
 # Orbitfolio
 
-Portfólio social espacial em Vite, JavaScript, Three.js, Node.js 22.13+ e SQLite. Projetos persistidos tornam-se planetas; Conta reúne projetos, seguidores, seguindo, amigos, curtidas, favoritos e privacidade.
+Portfólio social espacial em Vite, JavaScript, Three.js, Node.js 22.13+ e PostgreSQL. Projetos persistidos tornam-se planetas; Conta reúne projetos, seguidores, seguindo, amigos, curtidas, favoritos e privacidade.
 
 ## Executar
 
@@ -13,7 +13,7 @@ npm run dev
 
 Para a versão integrada: `npm start` e abra `http://localhost:3000`. As migrations são aplicadas automaticamente na abertura do banco. Node não carrega `.env` automaticamente: configure as variáveis no ambiente do processo/hosting ou use `node --env-file=.env server.mjs` no desenvolvimento.
 
-Por padrão, nenhum mock é carregado. `SEED_DEMO=true` habilita dados demonstrativos somente quando o banco está vazio. `ORBITFOLIO_DATABASE_PATH` seleciona o arquivo SQLite; em produção, configure um **disco persistente** e mantenha backups. Sem persistência do disco, um redeploy pode perder o banco. `PORT` é 3000 por padrão.
+Em produção, configure `DATABASE_URL` com PostgreSQL. Sem ela, o servidor em `NODE_ENV=production` não inicia. SQLite permanece somente para desenvolvimento e importação de backups. `PORT` é 3000 por padrão. Leia o [guia de transferência e novas funções](docs/POSTGRESQL-E-NOVAS-FUNCOES.md) antes de trocar o banco. `npm run seed:demo` adiciona Bruno Simon/Folio 2019 depois da importação; `SEED_DEMO=true` é exclusivo dos mocks de desenvolvimento.
 
 ## Projetos e GitHub
 
@@ -34,7 +34,7 @@ Progresso lista apenas projetos próprios integrados. Commits vêm da API real, 
 
 ## Universo
 
-W/S aceleram e freiam, A/D giram, Espaço/Shift controlam o eixo vertical. Clique em um planeta para aproximar a câmera e abrir suas informações sobre o universo. Fechar devolve o controle da nave. Posições iniciais dos planetas são persistidas no banco; movimentos causados por colisões permanecem durante a sessão. O spawn da nave pode mudar a cada nova inicialização.
+Clique na galáxia para capturar o mouse e girar a câmera. W/S aceleram e freiam, A/D movem lateralmente, Espaço/Shift controlam o eixo vertical. Mire um planeta a até 65 unidades da superfície e pressione E para abrir suas informações. Esc ou abrir uma interface libera o cursor. Posições iniciais dos planetas são persistidas no banco; movimentos causados por colisões permanecem durante a sessão. O spawn da nave pode mudar a cada nova inicialização.
 
 Os previews das outras páginas são snapshots Three.js gerados pela mesma fábrica de planetas. Há um renderizador compartilhado para previews, cache limitado e renderização sob demanda.
 
@@ -47,14 +47,18 @@ npx playwright install chromium
 npm run test:browser
 npm run test:world
 npm run test:projects
+npm run test:login
+# Com TEST_DATABASE_URL configurada para um PostgreSQL de teste:
+npm run test:postgres
+npm run test:features
 ```
 
 `CHROMIUM_EXECUTABLE` pode apontar para um Chromium instalado. Os testes usam bancos temporários. Reserve as portas 3091 (social), 3000/5173 (universo) e 3092/5174 (projetos). Testes OAuth usam respostas controladas exclusivamente no código de teste; não substituem a validação de consentimento com um OAuth App configurado.
 
 ## Estrutura atual
 
-- `server.mjs`, `server/`: API, autenticação, projetos, GitHub, privacidade e SQLite.
-- `database/migrations/`: evolução versionada do banco.
+- `server.mjs`, `server/`: API, autenticação, projetos, GitHub, privacidade e PostgreSQL.
+- `database/postgres/`: migrations de produção; `database/migrations/`: compatibilidade SQLite local.
 - `shared/`: configuração compartilhada de escala e limites.
 - `src/api/`, `src/pages/`, `src/components/`: cliente HTTP, páginas e componentes.
 - `src/three/`: cena, física, previews e fábrica de planetas.
@@ -65,7 +69,7 @@ O projeto mantém npm como caminho validado. O `pnpm-workspace.yaml` histórico 
 
 ## Backend tcc/back1 e navegação para planetas
 
-O backend PHP/MySQL adaptado está em `backend/`, com Dockerfile para execução Apache e a mesma API JSON do frontend. Consulte [configuração, migração e testes](backend/README.md) antes de mudar o runtime do site. `npm start` permanece Node/SQLite; os dois bancos não são sincronizados automaticamente.
+O backend PHP/MySQL histórico está preservado em `backend/`. O Dockerfile principal e `npm start` agora usam Node/PostgreSQL em produção. As novas funções são implementadas no backend Node; bancos MySQL, SQLite e PostgreSQL não são sincronizados automaticamente.
 
 Em “Continuar sem integração”, qualquer URL HTTP(S) de portfólio abre a personalização sem consultar o GitHub. Na busca, “Ir para o planeta” leva à Home e teletransporta a nave para uma posição livre junto ao planeta escolhido.
 

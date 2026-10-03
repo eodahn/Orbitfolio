@@ -1,19 +1,15 @@
-# Optional Blueprint for Node/SQLite. Applying it creates paid infrastructure.
-# For an EXISTING service, configure its disk/environment in the dashboard after backing up data.
+# Optional Blueprint for Node/PostgreSQL. Set DATABASE_URL to an existing database.
+# Import the SQLite backup BEFORE starting the app against the new database.
 services:
   - type: web
     name: orbitfolio
     runtime: node
     repo: https://github.com/eodahn/Orbitfolio
     branch: feature/frontend-rebuild
-    plan: starter
+    plan: free
     buildCommand: npm ci && npm run build
     startCommand: node server.mjs
     healthCheckPath: /api/health
-    disk:
-      name: orbitfolio-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
@@ -21,8 +17,10 @@ services:
         value: 22.16.0
       - key: SEED_DEMO
         value: 'false'
-      - key: ORBITFOLIO_DATABASE_PATH
-        value: /var/data/orbitfolio.sqlite
+      - key: DATABASE_URL
+        sync: false
+      - key: SEED_SHOWCASE
+        value: 'true'
       - key: APP_ORIGIN
         sync: false
       - key: GITHUB_CALLBACK_URL

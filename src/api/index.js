@@ -4,12 +4,19 @@ async function request(path, options = {}) {
   try {
     response = await fetch(path, {
       credentials: "same-origin",
+      ...options,
       headers: {
-        "Content-Type": "application/json",
+        ...(options.body instanceof FormData
+          ? {}
+          : { "Content-Type": "application/json" }),
         ...(options.headers ?? {}),
       },
-      ...options,
-      body: options.body ? JSON.stringify(options.body) : undefined,
+      body:
+        options.body instanceof FormData
+          ? options.body
+          : options.body
+            ? JSON.stringify(options.body)
+            : undefined,
     });
   } catch {
     throw new ApiError("Conexão perdida. Tente novamente.", 0);
@@ -49,6 +56,8 @@ export const api = {
       (await request("/api/projects", { method: "POST", body: input })).project,
   },
   users: {
+    uploadAvatar: async (body) =>
+      (await request("/api/account/avatar", { method: "POST", body })).user,
     section: (id, category) =>
       request(`/api/users/${encodeURIComponent(id)}/${category}`),
     update: async (input) =>

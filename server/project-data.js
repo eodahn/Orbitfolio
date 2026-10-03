@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { ApiError, requireUser } from "./app.js";
 import { WORLD, projectRadius } from "../shared/world-config.js";
 import { hash, random } from "../src/utils/seed.js";
-
 export function normalizeLanguages(input = {}) {
   if (!input || typeof input !== "object" || Array.isArray(input))
     throw new ApiError(422, "Linguagens inválidas.");
@@ -53,8 +52,8 @@ export function validProjectUrl(value = "") {
     throw new ApiError(422, "Informe um link http(s) válido.");
   }
 }
-export function ensureOrbits(db) {
-  const rows = db
+export async function ensureOrbits(db) {
+  const rows = await db
     .prepare(
       "SELECT id,size_bytes,orbit_x,orbit_y,orbit_z FROM projects ORDER BY created_at,id",
     )
@@ -97,29 +96,36 @@ export function ensureOrbits(db) {
         409,
         "O universo está cheio. Não foi possível posicionar o planeta com segurança.",
       );
-    update.run(position.x, position.y, position.z, p.id);
-    bodies.push({ ...position, r });
+    await update.run(position.x, position.y, position.z, p.id);
+    bodies.push({
+      ...position,
+      r,
+    });
   }
 }
-export function deleteProject(db, user, id) {
+export async function deleteProject(db, user, id) {
   requireUser(user);
-  const row = db.prepare("SELECT owner_id FROM projects WHERE id=?").get(id);
+  const row = await db
+    .prepare("SELECT owner_id FROM projects WHERE id=?")
+    .get(id);
   if (!row) throw new ApiError(404, "Projeto não encontrado.");
   if (row.owner_id !== user.id)
     throw new ApiError(
       403,
       "Somente o proprietário pode excluir este projeto.",
     );
-  db.prepare("DELETE FROM projects WHERE id=?").run(id);
+  await db.prepare("DELETE FROM projects WHERE id=?").run(id);
 }
-export function saveImport(db, user, metadata) {
+export async function saveImport(db, user, metadata) {
   const id = randomUUID();
-  db.prepare("DELETE FROM project_imports WHERE expires_at<?").run(Date.now());
-  db.prepare("INSERT INTO project_imports VALUES(?,?,?,?)").run(
-    id,
-    user.id,
-    JSON.stringify(metadata),
-    Date.now() + 30 * 60 * 1000,
-  );
-  return { importId: id, ...metadata };
+  await db
+    .prepare("DELETE FROM project_imports WHERE expires_at<?")
+    .run(Date.now());
+  await db
+    .prepare("INSERT INTO project_imports VALUES(?,?,?,?)")
+    .run(id, user.id, JSON.stringify(metadata), Date.now() + 30 * 60 * 1000);
+  return {
+    importId: id,
+    ...metadata,
+  };
 }

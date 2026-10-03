@@ -20,6 +20,8 @@ export function confirmDelete(name) {
       dialog.close("cancel");
       goHome();
     };
+    document.dispatchEvent(new Event("orbitfolio:ui"));
+    document.exitPointerLock?.();
     dialog.showModal();
   });
 }

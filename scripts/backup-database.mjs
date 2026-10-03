@@ -2,6 +2,10 @@ import { DatabaseSync, backup } from "node:sqlite";
 import { existsSync, mkdirSync, chmodSync, linkSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { databasePath } from "../server/storage.js";
+if (process.env.DATABASE_URL && !process.argv.includes("--sqlite"))
+  throw Error(
+    "PostgreSQL configurado: use pg_dump para backup. Para preservar o SQLite antigo, acrescente --sqlite explicitamente.",
+  );
 const target = process.argv[2];
 if (!target)
   throw Error("Informe o destino: npm run backup:db -- /caminho/backup.sqlite");

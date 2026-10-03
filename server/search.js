@@ -6,11 +6,15 @@ export const normalizeSearch = (value) =>
     .toLowerCase()
     .trim()
     .replace(/\s+/g, " ");
-export function searchAll(db, input, viewerId = null) {
+export async function searchAll(db, input, viewerId = null) {
   const q = normalizeSearch(input);
   if (q.length > 120)
     throw new ApiError(422, "Pesquise com até 120 caracteres.");
-  if (!q) return { users: [], projects: [] };
+  if (!q)
+    return {
+      users: [],
+      projects: [],
+    };
   const tokens = q.split(" "),
     score = (names, details = "") => {
       const fields = names.map(normalizeSearch),
@@ -22,7 +26,10 @@ export function searchAll(db, input, viewerId = null) {
     };
   const rank = (rows, names, details) =>
     rows
-      .map((row) => ({ row, score: score(names(row), details(row)) }))
+      .map((row) => ({
+        row,
+        score: score(names(row), details(row)),
+      }))
       .filter((r) => Number.isFinite(r.score))
       .sort(
         (a, b) =>
@@ -31,21 +38,28 @@ export function searchAll(db, input, viewerId = null) {
       .slice(0, 50)
       .map((r) => r.row);
   // Filter at SQL boundary before matching, ranking or counting private projects.
-  const projects = rank(
-    db
-      .prepare("SELECT * FROM projects WHERE github_private=0 OR owner_id=?")
-      .all(viewerId),
-    (p) => [p.name],
-    (p) =>
-      [
-        p.description_text ?? p.description,
-        ...Object.keys(JSON.parse(p.languages_json)),
-      ].join(" "),
-  ).map((p) => publicProject(db, p, viewerId));
-  const users = rank(
-    db.prepare("SELECT * FROM users").all(),
-    (u) => [u.name, u.username || ""],
-    () => "",
-  ).map((u) => publicUser(db, u, viewerId));
-  return { users, projects };
+  const projects = await Promise.all(
+    rank(
+      await db
+        .prepare("SELECT * FROM projects WHERE github_private=0 OR owner_id=?")
+        .all(viewerId),
+      (p) => [p.name],
+      (p) =>
+        [
+          p.description_text ?? p.description,
+          ...Object.keys(JSON.parse(p.languages_json)),
+        ].join(" "),
+    ).map(async (p) => await publicProject(db, p, viewerId)),
+  );
+  const users = await Promise.all(
+    rank(
+      await db.prepare("SELECT * FROM users").all(),
+      (u) => [u.name, u.username || ""],
+      () => "",
+    ).map(async (u) => await publicUser(db, u, viewerId)),
+  );
+  return {
+    users,
+    projects,
+  };
 }

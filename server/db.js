@@ -32,5 +32,54 @@ export function openDatabase(filename) {
       throw error;
     }
   }
-  return db;
+  return sqliteAdapter(db);
+}
+
+// Queue SQLite operations so an awaited transaction cannot absorb another request.
+function sqliteAdapter(raw) {
+  let tail = Promise.resolve();
+  const queue = (action) => {
+    const result = tail.then(action);
+    tail = result.catch(() => {});
+    return result;
+  };
+  const bound = (execute) => ({
+    dialect: "sqlite",
+    prepare(sql) {
+      return Object.fromEntries(
+        ["get", "all", "run"].map((method) => [
+          method,
+          (...args) => execute(() => raw.prepare(sql)[method](...args)),
+        ]),
+      );
+    },
+    exec: (sql) => execute(() => raw.exec(sql)),
+    close: () => execute(() => raw.close()),
+    transaction: (action) =>
+      queue(async () => {
+        raw.exec("BEGIN IMMEDIATE");
+        try {
+          const result = await action(
+            bound((action) => Promise.resolve().then(action)),
+          );
+          raw.exec("COMMIT");
+          return result;
+        } catch (error) {
+          raw.exec("ROLLBACK");
+          throw error;
+        }
+      }),
+  });
+  return bound(queue);
+}
+export async function openConfiguredDatabase(env = process.env) {
+  if (env.DATABASE_URL) {
+    const { openPostgres } = await import("./postgres.js");
+    return openPostgres(env.DATABASE_URL);
+  }
+  if (env.NODE_ENV === "production")
+    throw Error(
+      "DATABASE_URL é obrigatória em produção. Configure PostgreSQL antes de iniciar.",
+    );
+  return openDatabase();
 }

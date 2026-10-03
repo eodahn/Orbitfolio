@@ -1,3 +1,5 @@
+> Backend histórico PHP/MySQL. O Dockerfile principal agora inicia Node/PostgreSQL; as novas funções de avatar e cadastro pertencem ao backend Node. Veja `docs/POSTGRESQL-E-NOVAS-FUNCOES.md`.
+
 # Backend PHP/MySQL integrado ao frontend atual
 
 Origem: `eodahn/Orbitfolio:tcc` em `45e1310c6819acc8b31c9bcfc4962410fc6bd7c7`, atualizado com o backend `marinsoliveira-TG/Orbitf-lio:back1` em `89b940f630a07aaad39e8e3d0bee7e1ddccd016b`.

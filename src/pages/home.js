@@ -63,7 +63,7 @@ export async function renderHome(root) {
   const hasSeenFlightHint =
     sessionStorage.getItem("orbitfolio-flight-hint-dismissed") === "true";
   root.innerHTML = shell(
-    `<main class="universe-page"><canvas id="universe-canvas" tabindex="0" aria-label="Universo 3D navegável de projetos"></canvas><section class="home-intro${hasSeenFlightHint ? " is-dismissed" : ""}" data-flight-hint><p class="eyebrow">SEU PORTFÓLIO SOCIAL</p><h1>Explore projetos<br>como <em>planetas.</em></h1><p>Navegue com W A S D, Espaço e Shift. Aproxime-se ou clique em um planeta para conhecê-lo.</p></section><div class="flight-hud" aria-label="Controles de voo"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>voar</span></div></main>`,
+    `<main class="universe-page"><canvas id="universe-canvas" tabindex="0" aria-label="Universo 3D navegável de projetos"></canvas><section class="home-intro${hasSeenFlightHint ? " is-dismissed" : ""}" data-flight-hint><p class="eyebrow">SEU PORTFÓLIO SOCIAL</p><h1>Explore projetos<br>como <em>planetas.</em></h1><p>Clique na galáxia para pilotar. Mouse gira a câmera; W A S D move a nave. Mire um planeta próximo e pressione E. Esc libera o cursor.</p></section><div class="flight-hud" aria-label="Controles de voo"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>voar</span></div></main>`,
     "/",
   );
   const canvas = root.querySelector("#universe-canvas"),

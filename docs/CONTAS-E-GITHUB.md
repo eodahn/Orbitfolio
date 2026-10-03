@@ -1,5 +1,7 @@
 # Contas persistentes e configuração de login/GitHub
 
+> Atualização: produção usa PostgreSQL por `DATABASE_URL`. Os passos SQLite abaixo são históricos e servem para preservar a origem. Siga [o guia atual de migração](POSTGRESQL-E-NOVAS-FUNCOES.md).
+
 A imagem reportada mostra `401` em `/api/auth/login` e “Integração GitHub indisponível”. São rotas diferentes: `/api/auth/login` valida o e-mail/senha do Orbitfolio; OAuth inicia em `GET /api/github/auth` (mantendo `POST /api/github/connect`) e `/api/github/callback`. O 401 deve continuar existindo para credenciais inválidas. Não é possível concluir pela imagem se a conta deixou de existir, se a senha estava incorreta ou qual variável OAuth estava ausente.
 
 ## Contas não expiram

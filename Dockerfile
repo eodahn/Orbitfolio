@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim AS frontend
+FROM node:22-bookworm-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -7,13 +7,20 @@ COPY src ./src
 COPY shared ./shared
 RUN npm run build
 
-FROM php:8.3-apache-bookworm
-RUN apt-get update && apt-get install -y --no-install-recommends libonig-dev libcurl4-openssl-dev && docker-php-ext-install pdo_mysql mbstring curl && rm -rf /var/lib/apt/lists/*
-WORKDIR /var/www/orbitfolio
-COPY backend ./backend
-COPY --from=frontend /app/dist ./dist
-COPY deploy/apache.conf /etc/apache2/sites-available/000-default.conf
-COPY deploy/start-php.sh /usr/local/bin/start-orbitfolio
-RUN a2enmod rewrite && chmod +x /usr/local/bin/start-orbitfolio
-EXPOSE 10000
-CMD ["start-orbitfolio"]
+FROM node:22-bookworm-slim
+ENV NODE_ENV=production
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+COPY server.mjs ./
+COPY server ./server
+COPY shared ./shared
+COPY database ./database
+COPY scripts ./scripts
+# Development seed module is imported but disabled in production.
+COPY src/mocks ./src/mocks
+COPY src/utils ./src/utils
+COPY --from=build /app/dist ./dist
+USER node
+EXPOSE 3000
+CMD ["node", "server.mjs"]
