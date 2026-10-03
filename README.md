@@ -11,7 +11,7 @@ npm run server
 npm run dev
 ```
 
-Para a versão integrada: `npm start` e abra `http://localhost:3000`. As migrations são aplicadas automaticamente na abertura do banco. Node não carrega `.env` automaticamente: configure as variáveis no ambiente do processo/hosting ou use `node --env-file=.env server.mjs` no desenvolvimento.
+Para a versão integrada: `npm run build && npm start` e abra `http://localhost:3000`. As migrations são aplicadas automaticamente na abertura do banco. Node não carrega `.env` automaticamente: configure as variáveis no ambiente do processo/hosting ou use `node --env-file=.env server.mjs` no desenvolvimento.
 
 Em produção, configure `DATABASE_URL` com PostgreSQL. Sem ela, o servidor em `NODE_ENV=production` não inicia. SQLite permanece somente para desenvolvimento e importação de backups. `PORT` é 3000 por padrão. Leia o [guia de transferência e novas funções](docs/POSTGRESQL-E-NOVAS-FUNCOES.md) antes de trocar o banco. `npm run seed:demo` adiciona Bruno Simon/Folio 2019 depois da importação; `SEED_DEMO=true` é exclusivo dos mocks de desenvolvimento.
 

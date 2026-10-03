@@ -1,5 +1,5 @@
 # Optional Blueprint for Node/PostgreSQL. Set DATABASE_URL to an existing database.
-# Import the SQLite backup BEFORE starting the app against the new database.
+# Empty PostgreSQL is initialized automatically. SQLite import is optional and manual.
 services:
   - type: web
     name: orbitfolio

@@ -39,6 +39,18 @@ O código não tem acesso às credenciais privadas ou ao SQLite do Render. A exe
 
 As senhas permanecem como hashes; os IDs e relações são preservados. Mantenha a mesma `GITHUB_TOKEN_ENCRYPTION_KEY` para decifrar os tokens já salvos. Não é necessário recriar o OAuth App.
 
+## Diagnóstico de inicialização no Render
+
+Build Command: `npm ci && npm run build`. Start Command: `npm start` ou `node server.mjs`. O script `start` somente inicia o servidor; o build acontece na etapa de build. Nenhum desses comandos importa SQLite. Migrations PostgreSQL são aplicadas automaticamente antes de abrir a porta HTTP em `0.0.0.0:$PORT`. Um banco vazio é válido; não há necessidade de arquivo SQLite nem disco local.
+
+No commit `92fe379`, o aviso “Configure ORBITFOLIO_DATABASE_PATH” só era emitido quando `RENDER` estava definido e `DATABASE_URL` estava ausente/vazia no processo. Portanto, esse aviso não demonstrava falha de importação ou de migração PostgreSQL. A nova inicialização recusa SQLite também quando `RENDER=true`, mesmo sem `NODE_ENV=production`, e informa separadamente URL ausente/inválida, DNS, autenticação e permissões, sem registrar credenciais. Variáveis antigas `ORBITFOLIO_DATABASE_PATH` e `ORBITFOLIO_REQUIRE_EXISTING_DATABASE` não interferem quando PostgreSQL está selecionado.
+
+Se aparecer `[DATABASE_URL_MISSING]`, confira a chave exata `DATABASE_URL` no Environment do **serviço web Orbitfolio**, não apenas no recurso PostgreSQL, e salve com deploy. A opção “Save only” não atualiza processos já iniciados. Não coloque aspas, colchetes ou o texto `DATABASE_URL=` dentro do valor. Mudanças neste Blueprint não reconfiguram automaticamente um serviço criado pelo painel.
+
+Logs esperados: `Banco selecionado: postgres. Aplicando migrations pendentes.`, `Migrações postgres concluídas.` e `Orbitfolio disponível em 0.0.0.0:<porta>`. Confirme `/api/health` com `backend: node-postgres`. Se houver falha, compartilhe somente a mensagem/código sanitizado, sem URL, senha ou tokens. O aviso Vite de bundle acima de 500 kB não é erro de build.
+
+Regressão específica: `TEST_DATABASE_URL=... npm run test:startup` usa um schema temporário vazio, configuração de produção/Render e um caminho SQLite inexistente. Verifica erro claro sem URL, migrations automáticas, porta HTTP, cadastro, login após reinício e seed idempotente. O teste nunca usa `DATABASE_URL` de produção.
+
 ## Configuração
 
 No serviço Node do Render:

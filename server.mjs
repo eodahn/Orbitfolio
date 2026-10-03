@@ -1,7 +1,7 @@
 import { seedShowcase } from "./server/showcase.js";
 import { readAvatarMultipart, saveAvatar } from "./server/avatars.js";
 import { oauthErrorCode } from "./shared/oauth-errors.js";
-import { storageWarnings } from "./server/storage.js";
+import { databaseConfig, databaseStartupError } from "./server/database-config.js";
 import { searchAll } from "./server/search.js";
 import { createGithubService } from "./server/github.js";
 import { ensureOrbits, deleteProject } from "./server/project-data.js";
@@ -32,20 +32,21 @@ import {
   updateProfile,
 } from "./server/social.js";
 const root = fileURLToPath(new URL(".", import.meta.url));
-for (const warning of storageWarnings()) console.warn(warning);
 let db;
 try {
+  const config = databaseConfig();
+  console.log(`Banco selecionado: ${config.dialect}. Aplicando migrations pendentes.`);
   db = await openConfiguredDatabase();
-} catch {
-  console.error(
-    "Não foi possível iniciar o banco. Confira DATABASE_URL, conectividade e permissões.",
-  );
+  console.log(`Migrações ${db.dialect} concluídas.`);
+  if (process.env.SEED_SHOWCASE === "true") await seedShowcase(db);
+  if (process.env.SEED_DEMO === "true" && process.env.NODE_ENV !== "production" && process.env.RENDER !== "true")
+    await seedDevelopmentData(db);
+  await ensureOrbits(db);
+} catch (error) {
+  console.error(databaseStartupError(error));
+  await db?.close();
   process.exit(1);
 }
-if (process.env.SEED_SHOWCASE === "true") await seedShowcase(db);
-if (process.env.SEED_DEMO === "true" && process.env.NODE_ENV !== "production")
-  await seedDevelopmentData(db);
-await ensureOrbits(db);
 const github = createGithubService(db);
 const types = {
   ".html": "text/html; charset=utf-8",
@@ -511,9 +512,9 @@ const server = http.createServer(async (req, res) => {
     });
   }
 });
-server.listen(Number(process.env.PORT ?? 3000), () =>
+server.listen(Number(process.env.PORT ?? 3000), "0.0.0.0", () =>
   console.log(
-    `Orbitfolio disponível em http://localhost:${process.env.PORT ?? 3000}`,
+    `Orbitfolio disponível em 0.0.0.0:${server.address().port}`,
   ),
 );
 

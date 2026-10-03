@@ -1,4 +1,5 @@
 import { prepareDatabasePath } from "./storage.js";
+import { databaseConfig } from "./database-config.js";
 import { DatabaseSync } from "node:sqlite";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -73,13 +74,10 @@ function sqliteAdapter(raw) {
   return bound(queue);
 }
 export async function openConfiguredDatabase(env = process.env) {
-  if (env.DATABASE_URL) {
+  const config = databaseConfig(env);
+  if (config.dialect === "postgres") {
     const { openPostgres } = await import("./postgres.js");
-    return openPostgres(env.DATABASE_URL);
+    return openPostgres(config.connectionString);
   }
-  if (env.NODE_ENV === "production")
-    throw Error(
-      "DATABASE_URL é obrigatória em produção. Configure PostgreSQL antes de iniciar.",
-    );
   return openDatabase();
 }
