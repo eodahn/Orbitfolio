@@ -61,14 +61,33 @@ async function requestedPlanet() {
   const planet = universe.planets.find((p) => p.userData.project.id === id);
   await openHomeProject(planet.userData.project);
 }
+async function startHome() {
+  // Render the canvas and HUD immediately; network/model loading must not hold the loop.
+  const world = universe;
+  scheduleFlightHint();
+  world.start();
+  console.info("Orbitfolio: Home 3D iniciada com HUD da Dobra e controles atualizados.");
+  await Promise.all([
+    api.auth.session()
+      .catch(error => {
+        console.error("Orbitfolio: não foi possível identificar a sessão; usando nave padrão.", error);
+        return null;
+      })
+      .then(user => world.ship.userData.setUser(user)),
+    api.projects.list()
+      .then(projects => world.setProjects(projects))
+      .catch(error => {
+        console.error("Orbitfolio: falha ao carregar os planetas da Home.", error);
+        if (homeNode?.isConnected) toast("Não foi possível carregar os planetas.", "error");
+      }),
+  ]);
+  if (world.running && homeNode?.isConnected && location.pathname === "/")
+    await requestedPlanet();
+}
 export async function renderHome(root) {
   if (homeNode) {
     root.replaceChildren(homeNode);
-    universe.setProjects(await api.projects.list());
-    await universe.ship.userData.setUser(await api.auth.session());
-    scheduleFlightHint();
-    universe.start();
-    await requestedPlanet();
+    await startHome();
     return;
   }
   const hasSeenFlightHint =
@@ -88,11 +107,7 @@ export async function renderHome(root) {
       hint.classList.add("is-dismissed");
     },
   );
-  await universe.ship.userData.setUser(await api.auth.session());
-  scheduleFlightHint();
-  universe.setProjects(await api.projects.list());
-  universe.start();
-  await requestedPlanet();
+  await startHome();
 }
 export function pauseUniverse() {
   clearTimeout(flightHintTimer);

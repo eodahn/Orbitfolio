@@ -46,3 +46,25 @@ test('real GLBs parse, normalize scale and isolate rear materials',async()=>{
   disposeShipModel(model);
  }
 });
+test('loader failure identifies fallback explicitly and retry installs the real ship',async()=>{
+ const { createShip } = await import('../src/three/ship.js');
+ const info=console.info, warn=console.warn, error=console.error, logs=[];
+ console.info=console.warn=console.error=(...args)=>logs.push(args.join(' '));
+ let calls=0;
+ const ship=createShip({loader:{async loadAsync(url){
+  calls++;assert.equal(url,'/models/nave_orbt.glb');
+  if(calls===1)throw new Error('404 missing asset');
+  const bytes=await readFile(new URL('../public/models/nave_orbt.glb',import.meta.url));
+  return new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
+ }}});
+ try {
+  await ship.userData.setUser(null);
+  assert.equal(ship.userData.loadState,'error');assert.equal(ship.userData.modelName,'fallback');
+  assert.ok(logs.some(log=>log.includes('fallback ativada')));
+  await ship.userData.setUser(null);
+  assert.equal(ship.userData.loadState,'ready');assert.equal(ship.userData.modelName,'nave_orbt');
+  assert.equal(ship.children.length,1);
+  await ship.userData.setUser({username:'ordinary'});assert.equal(calls,2);
+  assert.ok(logs.some(log=>log.includes('adicionada à cena')));
+ }finally {ship.userData.dispose();console.info=info;console.warn=warn;console.error=error;}
+});

@@ -55,6 +55,7 @@ const types = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
+  ".glb": "model/gltf-binary",
 };
 const reply = (res, status, payload, headers = {}) => {
   res.writeHead(status, {
@@ -493,6 +494,8 @@ const server = http.createServer(async (req, res) => {
       statSync(requested).isFile()
         ? requested
         : join(dist, "index.html");
+    if (file !== requested && (path.startsWith("/models/") || path.startsWith("/assets/")))
+      return reply(res, 404, { error: `Asset não encontrado: ${path}. Execute npm run build e verifique o deploy.` });
     if (!existsSync(file)) {
       res.writeHead(503, {
         "Content-Type": "text/plain; charset=utf-8",
@@ -501,6 +504,7 @@ const server = http.createServer(async (req, res) => {
     }
     res.writeHead(200, {
       "Content-Type": types[extname(file)] ?? "application/octet-stream",
+      "Cache-Control": extname(file) === ".html" ? "no-store" : "no-cache",
     });
     res.end(readFileSync(file));
   } catch (error) {

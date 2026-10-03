@@ -922,7 +922,7 @@ a {
 .navigation-hud{position:absolute;inset:0;pointer-events:none;z-index:4}.navigation-hud[hidden]{display:none}.flight-crosshair{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff9;font-size:19px}.pointer-hint{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);color:#c3bfd3;font-size:12px}.aim-info{position:absolute;left:50%;top:57%;transform:translateX(-50%);display:grid;gap:5px;background:#121020db;border:1px solid #aaa0ff55;border-radius:12px;padding:12px 18px;max-width:320px;font-size:13px;text-align:center}.aim-info[hidden]{display:none}.aim-info b{color:#c9c0ff}
 
 .flight-hud[hidden] { display: none; }
-.warp-hud { position: fixed; left: 24px; top: 50%; transform: translateY(-50%); display: grid; justify-items: center; gap: 10px; color: #b8c6de; font-size: 11px; letter-spacing: .12em; pointer-events: none; }
+.warp-hud { z-index: 6; position: fixed; left: 24px; top: 50%; transform: translateY(-50%); display: grid; justify-items: center; gap: 10px; color: #b8c6de; font-size: 11px; letter-spacing: .12em; pointer-events: none; }
 .warp-track { width: 16px; height: 150px; border: 1px solid #60718b; background: #0a1024cc; padding: 3px; display: flex; align-items: flex-end; border-radius: 6px; }
 .warp-track i { width: 100%; height: 100%; background: #7b92b5; border-radius: 2px; }
 .warp-hud.is-active { color: #00ffff; }

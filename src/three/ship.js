@@ -25,7 +25,9 @@ export function prepareShipModel(scene, special) {
   const model = new THREE.Group(), thrusters = [];
   // Exported camera/light transforms are unrelated to the ship's native axes.
   const meshes = [];
-  (special ? scene : scene.getObjectByName("Cube")).traverse(m => { if (m.isMesh) meshes.push(m); });
+  const source = special ? scene : scene.getObjectByName("Cube");
+  if (!source) throw new Error("GLB da nave padrão sem o grupo Cube esperado.");
+  source.traverse(m => { if (m.isMesh) meshes.push(m); });
   const replacedMaterials = new Set();
   for (const mesh of meshes) {
     model.add(mesh);
@@ -60,7 +62,7 @@ export function prepareShipModel(scene, special) {
   model.scale.setScalar(scale); model.position.copy(center).multiplyScalar(-scale);
   return {model, thrusters};
 }
-export function createShip() {
+export function createShip({ loader = new GLTFLoader() } = {}) {
   const ship = new THREE.Group();
   ship.position.set(0,0,12); ship.userData.velocity = new THREE.Vector3();
   let current, requested, pending, generation = 0, disposed = false, effects = [], intensity = 0;
@@ -70,20 +72,30 @@ export function createShip() {
     if (requested === name) return pending;
     requested = name;
     const token = ++generation;
+    const url = `/models/${name}.glb`;
+    ship.userData.loadState = "loading";
+    console.info(`Orbitfolio: carregando nave ${name} de ${url}.`);
     // Remove the previous account's model before beginning a different load.
     if (current) { ship.remove(current); disposeShipModel(current); current = null; effects = []; }
     pending = (async () => {
       try {
-        const gltf = await new GLTFLoader().loadAsync(`/models/${name}.glb`);
+        const gltf = await loader.loadAsync(url);
         if (disposed || token !== generation) { disposeShipModel(gltf.scene); return; }
-        const prepared = prepareShipModel(gltf.scene, name === "navedamulher");
+        let prepared;
+        try { prepared = prepareShipModel(gltf.scene, name === "navedamulher"); }
+        catch (error) { disposeShipModel(gltf.scene); throw error; }
         current = prepared.model;
         effects = prepared.thrusters.map(material => ({material, color: material.color.clone(), emissive: material.emissive.clone(), intensity: material.emissiveIntensity}));
         ship.add(current); ship.userData.modelName = name;
+        ship.userData.loadState = "ready";
+        console.info(`Orbitfolio: nave ${name} adicionada à cena; ${effects.length} materiais de propulsão.`);
       } catch (error) {
         if (disposed || token !== generation) return;
         console.error(`Orbitfolio: falha ao carregar /models/${name}.glb`, error);
         current = createFallbackShip(); current.position.set(0,0,0); ship.add(current);
+        ship.userData.modelName = "fallback";
+        ship.userData.loadState = "error";
+        console.warn("Orbitfolio: nave antiga de fallback ativada. Verifique o GLB e o build servido.");
         requested = null;
       }
     })();
