@@ -409,7 +409,8 @@ export class Universe {
   }
   frame = () => {
     if (!this.running) return;
-    const delta = Math.min(this.clock.getDelta(), 0.05);
+    // Preserve elapsed flight time down to 4 FPS; cap long stalls/tab suspension.
+    const delta = Math.min(this.clock.getDelta(), 0.25);
     if (this.focus) {
       this.warp.update(false, delta);
       this.ship.userData.updateWarp?.(false, delta);

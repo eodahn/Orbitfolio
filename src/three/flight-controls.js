@@ -44,6 +44,7 @@ export class FlightControls {
     this.keys = new Set();
     this.listeners = [];
     this.fallback = !canvas.requestPointerLock;
+    this.fallbackNavigation = false;
     this.sensitivity = MOUSE_SENSITIVITY;
     this.listen(canvas, "click", () => this.capture());
     this.listen(doc, "pointerlockchange", () =>
@@ -73,7 +74,7 @@ export class FlightControls {
         this.onInteract();
         return;
       }
-      if (!this.navigation && !this.fallback) return;
+      if (!this.navigation && !this.fallbackNavigation) return;
       if (movementKeys.has(event.code)) {
         event.preventDefault();
         this.keys.add(event.code);
@@ -110,8 +111,8 @@ export class FlightControls {
     )
       return;
     this.canvas.focus();
-    if (!this.canvas.requestPointerLock) {
-      this.fallback = true;
+    if (this.fallback) {
+      this.fallbackNavigation = true;
       return;
     }
     try {
@@ -126,6 +127,7 @@ export class FlightControls {
     }
   }
   release() {
+    this.fallbackNavigation = false;
     this.setNavigation(false);
     if (this.doc.pointerLockElement === this.canvas)
       this.doc.exitPointerLock?.();

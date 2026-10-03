@@ -2,15 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { Warp, NORMAL_SPEED, WARP_SPEED_MULTIPLIER } from '../src/three/warp.js';
+import { Warp, NORMAL_SPEED, WARP_SPEED_MULTIPLIER, WARP_RECHARGE_RATE } from '../src/three/warp.js';
 import { shipModel, SPECIAL_SHIP_USERS, prepareShipModel, disposeShipModel } from '../src/three/ship.js';
 import { Universe } from '../src/three/universe.js';
 import { Group, Vector3 } from 'three';
 test('warp depletion, recovery while held, release, bounds and frame independence',()=>{
- for(const fps of [30,60,144]){
+ for(const fps of [4,10,30,60,144]){
   const w=new Warp();assert.equal(w.energy,100);
   for(let i=0;i<fps*5+1;i++)w.update(true,1/fps);
-  assert.equal(w.active,false);assert.ok(w.energy<1);
+  assert.equal(w.active,false);assert.ok(w.energy<=WARP_RECHARGE_RATE/fps+1e-6);
   for(let i=0;i<fps*2;i++)w.update(false,1/fps);
   assert.ok(w.energy>=20);assert.equal(w.update(true,1/fps),true);
   assert.equal(w.update(false,1/fps),false);
@@ -67,4 +67,49 @@ test('loader failure identifies fallback explicitly and retry installs the real 
   await ship.userData.setUser({username:'ordinary'});assert.equal(calls,2);
   assert.ok(logs.some(log=>log.includes('adicionada à cena')));
  }finally {ship.userData.dispose();console.info=info;console.warn=warn;console.error=error;}
+});
+test('real ship warp OFF/ON/OFF restores every material, swaps models and disposes late loads', async()=>{
+ const {createShip,SPECIAL_THRUSTERS}=await import('../src/three/ship.js');
+ const info=console.info;console.info=()=>{};
+ const calls=[];
+ const loader={async loadAsync(url){
+  calls.push(url);
+  const bytes=await readFile(new URL('../public'+url,import.meta.url));
+  return new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
+ }};
+ const ship=createShip({loader});
+ try {
+  for(const user of [null,{username:' GeOvAnNaVnDs '}]){
+   await ship.userData.setUser(user);
+   const before=[];
+   ship.traverse(m=>{if(m.isMesh)before.push({mesh:m,color:m.material.color.clone(),emissive:m.material.emissive.clone(),intensity:m.material.emissiveIntensity});});
+   const expected=user?5:3;
+   ship.userData.updateWarp(true,2);
+   const changed=before.filter(({mesh,color})=>!mesh.material.color.equals(color));
+   assert.equal(changed.length,expected);
+   for(const {mesh} of changed){
+    assert.ok(user?SPECIAL_THRUSTERS.has(mesh.name):mesh.name==='warp-thruster');
+    assert.ok(mesh.material.emissive.g>.99&&mesh.material.emissive.b>.99);
+   }
+   ship.userData.updateWarp(false,2);
+   for(const entry of before){
+    assert.ok(entry.mesh.material.color.equals(entry.color));
+    assert.ok(entry.mesh.material.emissive.equals(entry.emissive));
+    assert.equal(entry.mesh.material.emissiveIntensity,entry.intensity);
+   }
+   assert.equal(ship.children.length,1);
+  }
+  assert.deepEqual(calls,['/models/nave_orbt.glb','/models/navedamulher.glb']);
+  await ship.userData.setUser({username:'gi_sinmene'});
+  assert.equal(calls.length,2);
+ }finally{ship.userData.dispose();console.info=info;}
+ let release;
+ const gltf=await loader.loadAsync('/models/nave_orbt.glb');
+ let disposals=0;gltf.scene.traverse(m=>{if(m.geometry)m.geometry.addEventListener('dispose',()=>disposals++);});
+ const late=createShip({loader:{loadAsync:()=>new Promise(resolve=>{release=resolve;})}});
+ const previousInfo=console.info;console.info=()=>{};
+ try{
+  const loading=late.userData.setUser(null);late.userData.dispose();release(gltf);await loading;
+  assert.equal(late.children.length,0);assert.ok(disposals>0);
+ }finally{console.info=previousInfo;}
 });

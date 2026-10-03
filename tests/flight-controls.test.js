@@ -102,3 +102,28 @@ test("center raycast considers planet surfaces, rejects distant planets and off-
   surface.geometry.dispose();
   surface.material.dispose();
 });
+test("fallback flight requires canvas capture and ESC/UI releases all modifiers", () => {
+  const doc = new EventTarget(), host = new EventTarget(), canvas = new EventTarget();
+  doc.querySelector = () => null;
+  canvas.focus = () => { doc.activeElement = canvas; };
+  const controls = new FlightControls(canvas, { document: doc, host });
+  const press = code => {
+    const key = new Event('keydown', {cancelable:true});
+    Object.assign(key, {code}); host.dispatchEvent(key); return key.defaultPrevented;
+  };
+  for (const key of ['KeyW','Space','ControlLeft','ShiftLeft']) assert.equal(press(key), false);
+  assert.equal(controls.keys.size,0);
+  event(canvas,'click');
+  for (const key of ['KeyW','Space','ControlLeft','ShiftLeft']) assert.equal(press(key), true);
+  assert.equal(controls.keys.size,4);
+  press('Escape');
+  assert.equal(controls.keys.size,0);
+  assert.equal(press('Space'),false);
+  event(canvas,'click');press('ControlRight');press('ShiftRight');
+  event(doc,'orbitfolio:ui');
+  assert.equal(controls.keys.size,0);assert.equal(press('ControlRight'),false);
+  event(canvas,'click');
+  doc.activeElement={closest:()=>true};event(doc,'focusin');
+  assert.equal(press('ShiftRight'),false);
+  controls.dispose();
+});
