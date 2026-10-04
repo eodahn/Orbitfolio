@@ -1,0 +1,33 @@
+# Optional Blueprint for Node/PostgreSQL. Set DATABASE_URL to an existing database.
+# Empty PostgreSQL is initialized automatically. SQLite import is optional and manual.
+services:
+  - type: web
+    name: orbitfolio
+    runtime: node
+    repo: https://github.com/eodahn/Orbitfolio
+    branch: feature/frontend-rebuild
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: node server.mjs
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22.16.0
+      - key: SEED_DEMO
+        value: 'false'
+      - key: DATABASE_URL
+        sync: false
+      - key: SEED_SHOWCASE
+        value: 'true'
+      - key: APP_ORIGIN
+        sync: false
+      - key: GITHUB_CALLBACK_URL
+        value: https://orbitfolio.onrender.com/api/github/callback
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_TOKEN_ENCRYPTION_KEY
+        sync: false
