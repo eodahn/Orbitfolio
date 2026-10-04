@@ -65,7 +65,7 @@ export function collisionPairs(bodies) {
   }
   return pairs;
 }
-export function stepPhysics(bodies, delta) {
+export function stepPhysics(bodies, delta, { bounded = true } = {}) {
   // At max ship speed 30, 120 Hz steps move .25 units, well below the smallest radius.
   const steps = Math.max(1, Math.ceil(delta * 120)),
     dt = delta / steps;
@@ -73,6 +73,6 @@ export function stepPhysics(bodies, delta) {
     for (const b of bodies) b.position.addScaledVector(b.userData.velocity, dt);
     for (let pass = 0; pass < 3; pass++)
       for (const [a, b] of collisionPairs(bodies)) resolveCollision(a, b);
-    for (const b of bodies) contain(b);
+    if (bounded) for (const b of bodies) contain(b);
   }
 }

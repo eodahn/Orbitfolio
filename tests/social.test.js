@@ -67,6 +67,7 @@ test("mutual follows, privacy for every category, owner access, editing and byte
     sizeBytes: 2147483648,
   });
   assert.equal((await publicProject(db, project, a.id)).sizeBytes, 2147483648);
+  assert.deepEqual((await publicProject(db, { ...project, language_bytes_json: JSON.stringify({HTML:300,CSS:100}) }, a.id)).languageBytes, {HTML:300,CSS:100});
   for (const table of ["project_likes", "favorites"])
     await setRelation(
       db,

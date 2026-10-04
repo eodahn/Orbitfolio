@@ -929,3 +929,19 @@ a {
 .warp-hud.is-active .warp-track { box-shadow: 0 0 16px #00ffff55; }
 .warp-hud.is-active i { background: #00ffff; }
 .warp-hud.is-empty { color: #b98181; }
+
+.language-tooltip {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 32px);
+  transform: translateX(-50%);
+  z-index: 6;
+  pointer-events: none;
+  padding: 7px 12px;
+  border: 1px solid #a8b8d540;
+  border-radius: 8px;
+  background: #080c18dc;
+  color: #e4ecff;
+  font-size: 12px;
+}
+.language-tooltip[hidden] { display: none; }

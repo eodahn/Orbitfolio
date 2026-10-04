@@ -127,3 +127,15 @@ test("fallback flight requires canvas capture and ESC/UI releases all modifiers"
   assert.equal(press('ShiftRight'),false);
   controls.dispose();
 });
+
+test('handled planet/moon click uses the existing listener without capturing pointer lock', () => {
+  const doc = new EventTarget(), host = new EventTarget(), canvas = new EventTarget();
+  doc.querySelector = () => null;
+  canvas.focus = () => {};
+  let captures = 0, clicks = 0;
+  canvas.requestPointerLock = () => captures++;
+  const controls = new FlightControls(canvas, { document: doc, host, onCanvasClick: () => { clicks++; return true; } });
+  event(canvas, 'click');
+  assert.equal(clicks, 1); assert.equal(captures, 0);
+  controls.dispose(); event(canvas, 'click'); assert.equal(clicks, 1);
+});

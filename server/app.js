@@ -160,6 +160,7 @@ export async function publicProject(
       defaultBranch: project.github_default_branch,
     },
     languages: JSON.parse(project.languages_json),
+    languageBytes: JSON.parse(project.language_bytes_json || "{}"),
     githubUrl: project.github_url,
     demoUrl: project.demo_url,
     views: project.views,

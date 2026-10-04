@@ -106,6 +106,7 @@ export async function renderHome(root) {
       sessionStorage.setItem("orbitfolio-flight-hint-dismissed", "true");
       hint.classList.add("is-dismissed");
     },
+    { onLanguageClick: ({ language, percentage, estimated }) => toast(`${language}: ${estimated ? "≈ " : ""}${Number(percentage.toFixed(4))}%`) },
   );
   await startHome();
 }

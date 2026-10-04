@@ -1,12 +1,14 @@
 import * as THREE from "three";
 import { createPlanet, disposePlanet } from "./planet-factory.js";
-import { projectRadius, WORLD } from "./world.js";
 import { escapeHtml as e } from "../utils/html.js";
 export function previewMarkup(project, large = false) {
   const data = encodeURIComponent(
     JSON.stringify({
       id: project.id,
       languages: project.languages,
+      languageBytes: project.languageBytes,
+      frameworksOrTools: project.frameworksOrTools,
+      views: project.views,
       sizeBytes: project.sizeBytes,
     }),
   );
@@ -54,7 +56,7 @@ export function startPlanetPreviews(root) {
           renderer.setPixelRatio(1);
           renderer.setSize(canvas.width, canvas.height, false);
           const scene = new THREE.Scene(),
-            camera = new THREE.PerspectiveCamera(42, 1, 0.1, 300);
+            camera = new THREE.PerspectiveCamera(42, 1, 0.1, 1000);
           const project = JSON.parse(decodeURIComponent(canvas.dataset.planet)),
             planet = createPlanet(project, 32);
           scene.add(
@@ -67,7 +69,7 @@ export function startPlanetPreviews(root) {
           camera.position.set(
             0,
             0,
-            framingDistance(projectRadius(project.sizeBytes), 42, 1),
+            framingDistance(planet.userData.visualRadius, 42, 1),
           );
           camera.lookAt(0, 0, 0);
           renderer.render(scene, camera);

@@ -25,6 +25,7 @@ export class FlightControls {
       onMode = () => {},
       onInteract = () => {},
       onMove = () => {},
+      onCanvasClick = () => false,
       document: doc = globalThis.document,
       host = globalThis.window,
     } = {},
@@ -46,7 +47,10 @@ export class FlightControls {
     this.fallback = !canvas.requestPointerLock;
     this.fallbackNavigation = false;
     this.sensitivity = MOUSE_SENSITIVITY;
-    this.listen(canvas, "click", () => this.capture());
+    this.listen(canvas, "click", event => {
+      if (!canNavigate() || doc.querySelector?.('dialog[open],[role="dialog"]')) return;
+      if (!onCanvasClick(event)) this.capture();
+    });
     this.listen(doc, "pointerlockchange", () =>
       this.setNavigation(doc.pointerLockElement === canvas && canNavigate()),
     );

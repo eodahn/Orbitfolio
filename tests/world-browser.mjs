@@ -82,7 +82,39 @@ try {
     await page.waitForFunction(() => window.world?.running);
   }
   await initialize();
+  await page.waitForFunction(() => window.world.planets.length > 0 && window.world.ship.userData.loadState === "ready");
   const first = await page.evaluate(() => window.world.ship.position.toArray());
+  // Exercise the integrated Home, including GPU resources and custom shaders.
+  const procedural = await page.evaluate(async () => {
+    const u = window.world;
+    u.stop();
+    const budget = (u.space.config.activeRadius * 2 + 1) ** 3;
+    const project = u.planets[0].userData.project;
+    const beforeOrbit = [...project.orbit];
+    const geometries = [];
+    for (let i = 1; i <= 12; i++) {
+      u.ship.position.set(i * 5000, i * 100, -i * 200);
+      u.rebaseWorld();
+      u.renderer.render(u.scene, u.camera);
+      geometries.push(u.renderer.info.memory.geometries);
+      if (u.space.chunks.size !== budget) throw new Error('Unbounded chunk count');
+      if (u.ship.position.length() !== 0) throw new Error('Origin was not rebased');
+    }
+    const teleported = u.teleportToPlanet(project.id);
+    const localPlanet = u.planets.find(p => p.userData.project.id === project.id);
+    localPlanet.update(0, u.camera.position);
+    u.renderer.render(u.scene, u.camera);
+    const result = { budget, teleported, beforeOrbit, afterOrbit: project.orbit, localDistance: localPlanet.position.distanceTo(u.ship.position), moonCount: localPlanet.moons.length, geometrySpread: Math.max(...geometries) - Math.min(...geometries), localShip: u.ship.position.length() };
+    u.start();
+    return result;
+  });
+  assert.ok(procedural.teleported);
+  assert.deepEqual(procedural.beforeOrbit, procedural.afterOrbit);
+  assert.equal(procedural.localShip, 0);
+  assert.ok(procedural.localDistance < 250);
+  assert.ok(procedural.moonCount <= 4);
+  assert.ok(procedural.geometrySpread <= 3, 'GPU geometry count should stabilize during travel');
+
   await page.keyboard.down("KeyW");
   await page.waitForTimeout(250);
   await page.keyboard.up("KeyW");
@@ -103,6 +135,41 @@ try {
     await page.waitForFunction(() => window.world.running);
     assert.deepEqual(await page.evaluate(() => window.resumed), paused);
   }
+  const moonInteraction = await page.evaluate(async () => {
+    const { PlanetSystem } = await import('/src/three/planet-system.js');
+    const u = window.world;
+    const Vector3 = u.ship.position.constructor;
+    u.stop();
+    const actual = u.planets[0].userData.project;
+    const planet = new PlanetSystem({ ...actual, languages: {HTML:50, JavaScript:25, CSS:25}, languageBytes: {}, views: 1500 });
+    const originalPlanets = u.planets;
+    originalPlanets.forEach(p => p.visible = false);
+    planet.userData.globalPosition = u.origin.localToGlobal(new Vector3());
+    u.planets = [planet]; u.scene.add(planet);
+    const moon = planet.moons[0];
+    planet.updateMatrixWorld(true);
+    const position = moon.getWorldPosition(new Vector3());
+    u.camera.position.copy(position).add(new Vector3(0, 0, moon.userData.radius * 4));
+    u.camera.lookAt(position); u.ship.position.copy(u.camera.position);
+    u.controls.navigation = true;
+    u.updateAim();
+    let clicked;
+    const callback = u.onLanguageClick;
+    u.onLanguageClick = payload => clicked = payload;
+    u.activateHit(u.moonAim);
+    u.renderer.render(u.scene, u.camera);
+    const tooltip = u.moonTooltip.textContent, visible = !u.moonTooltip.hidden;
+    planet.update(0, new Vector3(10000,0,0)); u.updateAim();
+    const hidden = u.moonTooltip.hidden;
+    u.onLanguageClick = callback; u.controls.navigation = false;
+    u.planets = originalPlanets; u.scene.remove(planet); planet.dispose();
+    u.teleportToPlanet(actual.id); u.start();
+    return {clicked, tooltip, visible, hidden};
+  });
+  assert.ok(moonInteraction.visible && moonInteraction.hidden);
+  assert.equal(moonInteraction.clicked.percentage,25);
+  assert.match(moonInteraction.tooltip, /25%/);
+
   // Render a close view, then exercise both collision types in the actual render loop.
   await page.evaluate(() => {
     const u = window.world;
