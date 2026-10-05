@@ -42,6 +42,9 @@ export class FlightControls {
       pitch: 0,
       navigation: false,
     });
+    this.lockPending = null;
+    this.unlockPending = false;
+    this.disposed = false;
     this.keys = new Set();
     this.listeners = [];
     this.fallback = !canvas.requestPointerLock;
@@ -51,15 +54,10 @@ export class FlightControls {
       if (!canNavigate() || doc.querySelector?.('dialog[open],[role="dialog"]')) return;
       if (!onCanvasClick(event)) this.capture();
     });
-    this.listen(doc, "pointerlockchange", () =>
-      this.setNavigation(doc.pointerLockElement === canvas && canNavigate()),
-    );
-    this.listen(doc, "pointerlockerror", () => {
-      this.fallback = true;
-      this.release();
-    });
+    this.listen(doc, "pointerlockchange", () => this.syncPointerLock());
+    this.listen(doc, "pointerlockerror", () => this.pointerLockError());
     this.listen(doc, "mousemove", (event) => {
-      if (!this.navigation || this.blocked()) return;
+      if (doc.pointerLockElement !== canvas || !this.navigation || this.blocked()) return;
       this.yaw -= event.movementX * this.sensitivity;
       this.yaw = Math.atan2(Math.sin(this.yaw), Math.cos(this.yaw));
       this.pitch = Math.max(
@@ -68,11 +66,11 @@ export class FlightControls {
       );
     });
     this.listen(host, "keydown", (event) => {
-      if (!canNavigate() || this.blocked() || isTyping(event.target)) return;
-      if (event.code === "Escape") {
+      if (event.key === "Escape" || event.key === "Esc" || event.code === "Escape") {
         this.release();
         return;
       }
+      if (!canNavigate() || this.blocked() || isTyping(event.target)) return;
       if (event.code === "KeyE" && this.navigation && !event.repeat) {
         event.preventDefault();
         this.onInteract();
@@ -108,8 +106,23 @@ export class FlightControls {
     this.keys.clear();
     this.onMode(active);
   }
+  syncPointerLock() {
+    const cancelled = this.lockPending?.cancelled;
+    this.lockPending = null;
+    this.unlockPending = false;
+    this.fallbackNavigation = false;
+    this.setNavigation(this.doc.pointerLockElement === this.canvas && this.canNavigate() && !this.disposed);
+    if (this.doc.pointerLockElement === this.canvas &&
+        (cancelled || this.disposed || !this.canNavigate() || this.doc.querySelector?.('dialog[open],[role="dialog"]')))
+      this.release();
+  }
+  pointerLockError() {
+    // A rejected request is temporary; only a missing API enables the fallback.
+    this.syncPointerLock();
+  }
   capture() {
     if (
+      this.disposed || this.lockPending || this.unlockPending || this.doc.pointerLockElement ||
       !this.canNavigate() ||
       this.doc.querySelector?.('dialog[open],[role="dialog"]')
     )
@@ -119,25 +132,41 @@ export class FlightControls {
       this.fallbackNavigation = true;
       return;
     }
+    const attempt = { cancelled: false };
+    this.lockPending = attempt;
     try {
       const request = this.canvas.requestPointerLock();
-      request?.catch?.(() => {
-        this.fallback = true;
-        this.release();
-      });
+      request?.then?.(
+        () => { if (this.lockPending === attempt) this.syncPointerLock(); },
+        () => { if (this.lockPending === attempt) this.pointerLockError(); },
+      );
     } catch {
-      this.fallback = true;
-      this.release();
+      if (this.lockPending === attempt) this.pointerLockError();
     }
   }
   release() {
+    if (this.lockPending) this.lockPending.cancelled = true;
     this.fallbackNavigation = false;
+    this.keys.clear();
+    if (this.doc.pointerLockElement === this.canvas) {
+      if (this.unlockPending) return;
+      this.unlockPending = true;
+      try {
+        this.doc.exitPointerLock?.();
+      } catch {
+        this.unlockPending = false;
+      }
+      // Do not announce an unlock while the browser still owns the pointer.
+      if (this.doc.pointerLockElement === this.canvas) return;
+    }
+    this.unlockPending = false;
     this.setNavigation(false);
-    if (this.doc.pointerLockElement === this.canvas)
-      this.doc.exitPointerLock?.();
   }
   dispose() {
+    this.disposed = true;
     this.release();
+    this.lockPending = null;
+    this.unlockPending = false;
     for (const remove of this.listeners) remove();
     this.listeners = [];
   }

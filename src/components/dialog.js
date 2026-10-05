@@ -21,7 +21,6 @@ export function confirmDelete(name) {
       goHome();
     };
     document.dispatchEvent(new Event("orbitfolio:ui"));
-    document.exitPointerLock?.();
     dialog.showModal();
   });
 }

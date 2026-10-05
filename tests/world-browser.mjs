@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import assert from "node:assert/strict";
+import { testPointerLock } from './pointer-lock-browser.mjs';
 const temp = await mkdtemp(join(tmpdir(), "orbit-world-"));
 const server = spawn(process.execPath, ["server.mjs"], {
   env: {
@@ -83,6 +84,7 @@ try {
   }
   await initialize();
   await page.waitForFunction(() => window.world.planets.length > 0 && window.world.ship.userData.loadState === "ready");
+  await testPointerLock(page);
   const first = await page.evaluate(() => window.world.ship.position.toArray());
   // Read actual GPU pixels: compilation alone cannot catch zeroed palette uniforms.
   const palettePixels = await page.evaluate(async () => {

@@ -16,7 +16,6 @@ export function goHome() {
 }
 export async function renderCurrent() {
   document.dispatchEvent(new Event("orbitfolio:ui"));
-  document.exitPointerLock?.();
   try {
     const route =
       routes.get(location.pathname) ||
