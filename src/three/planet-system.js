@@ -24,20 +24,22 @@ function surfaceMaterial(color, seed, layers = []) {
   material.onBeforeCompile = shader => {
     shader.uniforms.planetSeed = { value: seed % 997 };
     const total=layers.reduce((sum,item)=>sum+item.percentage,0) || 1;
-    // A CPU-generated shader per composition, shared GPU program for equal layer counts.
+    // All languages participate, without the UI secondary-language cap.
+    // Only N-1 edges are read: match the active GLSL array size exactly.
+    // Height is uniform in sphere surface area; noise is only texture shading.
     shader.uniforms.biomeColors={value:layers.map(item=>new THREE.Color(item.color))};
     let accumulated=0;
-    shader.uniforms.biomeEdges={value:layers.map(item=>(accumulated+=item.percentage/total))};
+    shader.uniforms.biomeEdges={value:layers.slice(0, -1).map(item=>(accumulated+=item.percentage/total))};
     shader.vertexShader = 'varying vec3 planetPosition;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nplanetPosition=position;');
-    shader.fragmentShader = (layers.length ? `uniform vec3 biomeColors[${layers.length}];\nuniform float biomeEdges[${layers.length}];\n` : '') + 'varying vec3 planetPosition;\nuniform float planetSeed;\n' + noiseGLSL + shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+    shader.fragmentShader = (layers.length ? `uniform vec3 biomeColors[${layers.length}];\n${layers.length > 1 ? `uniform float biomeEdges[${layers.length - 1}];\n` : ''}` : '') + 'varying vec3 planetPosition;\nuniform float planetSeed;\n' + noiseGLSL + shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
 vec3 terrain=normalize(planetPosition)*5.0+planetSeed;
 float land=planetNoise(terrain)*.65+planetNoise(terrain*2.13)*.25+planetNoise(terrain*4.27)*.10;
-${layers.length ? `float biome=clamp(land*1.9-.45,0.0,1.0);vec3 pigment=biomeColors[0];
-${layers.slice(1).map((_,i)=>`pigment=mix(pigment,biomeColors[${i+1}],smoothstep(biomeEdges[${i}]-.035,biomeEdges[${i}]+.035,biome));`).join('\n')}
+${layers.length ? `float biome=clamp(normalize(planetPosition).y*.5+.5,0.0,1.0);vec3 pigment=biomeColors[0];
+${layers.slice(1).map((_,i)=>`pigment=mix(pigment,biomeColors[${i+1}],step(biomeEdges[${i}],biome));`).join('\n')}
 diffuseColor.rgb= pigment;` : ''}
 diffuseColor.rgb*=.48+smoothstep(.25,.75,land)*.75;`);
   };
-  material.customProgramCacheKey = () => `orbitfolio-terrain-v2-${layers.length}`;
+  material.customProgramCacheKey = () => `orbitfolio-terrain-v3-${layers.length}`;
   return material;
 }
 export function ringEligible(project) {
@@ -56,7 +58,7 @@ export class PlanetSystem extends THREE.Group {
     const radius = projectRadius(project.sizeBytes), seed = hash(String(project.id)), rng = random(seed);
     const color = new THREE.Color(this.visuals.base.color);
     const geometry = acquireSphere(detail);
-    const surface = new THREE.Mesh(geometry, surfaceMaterial(color, seed, [this.visuals.base,...this.visuals.surface]));
+    const surface = new THREE.Mesh(geometry, surfaceMaterial(color, seed, this.languages.languages));
     surface.scale.setScalar(radius);
     surface.userData = { type: 'projectPlanet', projectId: project.id };
     this.add(surface);
@@ -96,10 +98,16 @@ void main(){float rim=pow(1.0-max(dot(normalize(vNormal),normalize(vView)),0.0),
       group.add(moon); this.add(group); this.moons.push(moon);
       this.orbits.push({ group, moon, radius: orbitRadius, speed: (.07 + local() * .07) / (1 + index * .25), phase: local() * Math.PI * 2 });
     });
-    this.rings = this.visuals.rings.map((technology,index,all) => {
-      const inner=1.22+index*.33/all.length,outer=inner+.27/all.length;
+    let ringArea = 0;
+    const ringTotal = this.visuals.rings.reduce((sum, item) => sum + item.percentage, 0);
+    this.rings = this.visuals.rings.map(technology => {
+      // Concentric annuli share available area in their language proportions.
+      const area = 1.49 ** 2 - 1.22 ** 2;
+      const inner = Math.sqrt(1.22 ** 2 + area * ringArea);
+      ringArea += technology.percentage / ringTotal;
+      const outer = Math.sqrt(1.22 ** 2 + area * ringArea);
       const ring=new THREE.Mesh(new THREE.RingGeometry(radius*inner,radius*outer,64),new THREE.MeshStandardMaterial({color:technology.color,transparent:true,opacity:.48,side:THREE.DoubleSide,depthWrite:false,roughness:.9}));
-      ring.rotation.set(Math.PI/2+.18,.1,-.2);ring.userData.technology=technology.name;this.add(ring);return ring;
+      ring.rotation.set(Math.PI/2+.18,.1,-.2);ring.userData.technology=technology.name;ring.userData.percentage=technology.percentage;this.add(ring);return ring;
     });
     this.ring=this.rings[0];
     this.userData = { project, radius, visualRadius: this.moons.length ? orbitEdge : radius * (this.ring ? 1.55 : 1.03), mass: planetMass(radius), velocity: new THREE.Vector3(), surface, atmosphere, spin: .12 + rng() * .24 };

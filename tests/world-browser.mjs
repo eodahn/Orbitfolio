@@ -84,6 +84,40 @@ try {
   await initialize();
   await page.waitForFunction(() => window.world.planets.length > 0 && window.world.ship.userData.loadState === "ready");
   const first = await page.evaluate(() => window.world.ship.position.toArray());
+  // Read actual GPU pixels: compilation alone cannot catch zeroed palette uniforms.
+  const palettePixels = await page.evaluate(async () => {
+    const THREE = await import('/node_modules/three/build/three.module.js');
+    const { PlanetSystem } = await import('/src/three/planet-system.js');
+    const planet = new PlanetSystem({id:'palette-regression', languages:{JavaScript:65,HTML:10,CSS:10,PowerShell:5,PostgreSQL:5,Prolog:5}});
+    const renderer = new THREE.WebGLRenderer();
+    const target = new THREE.WebGLRenderTarget(512,512);
+    try {
+      const scene = new THREE.Scene(), radius = planet.userData.radius;
+      scene.add(planet.userData.surface, new THREE.AmbientLight(0xffffff, 2));
+      const camera = new THREE.OrthographicCamera(-radius,radius,radius,-radius,.1,radius*10);
+      camera.position.z = radius*3;
+      camera.lookAt(0,0,0);
+      renderer.setRenderTarget(target);
+      renderer.render(scene,camera);
+      let edge = 0;
+      const pixels = planet.languages.languages.map(language => {
+        const height = edge + language.percentage/200;
+        edge += language.percentage/100;
+        const pixel = new Uint8Array(4);
+        renderer.readRenderTargetPixels(target,256,Math.floor(height*512),1,1,pixel);
+        return Array.from(pixel);
+      });
+      if(renderer.getContext().getError() !== 0) throw new Error('Palette WebGL error');
+      return pixels;
+    } finally {
+      // The surface was moved into the isolated scene above.
+      planet.add(planet.userData.surface);
+      planet.dispose(); target.dispose(); renderer.dispose(); renderer.forceContextLoss();
+    }
+  });
+  assert.equal(new Set(palettePixels.map(pixel=>pixel.slice(0,3).join(','))).size, 6);
+  assert.ok(palettePixels.every(pixel=>pixel[3]===255 && Math.max(...pixel.slice(0,3))>0));
+
   // Exercise the integrated Home, including GPU resources and custom shaders.
   const procedural = await page.evaluate(async () => {
     const u = window.world;
