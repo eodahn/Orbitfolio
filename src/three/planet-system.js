@@ -30,14 +30,17 @@ function surfaceMaterial(color, seed, layers = []) {
     shader.uniforms.biomeColors={value:layers.map(item=>new THREE.Color(item.color))};
     let accumulated=0;
     shader.uniforms.biomeEdges={value:layers.slice(0, -1).map(item=>(accumulated+=item.percentage/total))};
-    shader.vertexShader = 'varying vec3 planetPosition;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nplanetPosition=position;');
-    shader.fragmentShader = (layers.length ? `uniform vec3 biomeColors[${layers.length}];\n${layers.length > 1 ? `uniform float biomeEdges[${layers.length - 1}];\n` : ''}` : '') + 'varying vec3 planetPosition;\nuniform float planetSeed;\n' + noiseGLSL + shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+    // Keep explicit newlines at injection boundaries, including before Three.js directives.
+    shader.vertexShader = 'varying vec3 planetPosition;\n' + shader.vertexShader.replace('#include <begin_vertex>', '\n#include <begin_vertex>\nplanetPosition=position;\n');
+    shader.fragmentShader = (layers.length ? `uniform vec3 biomeColors[${layers.length}];\n${layers.length > 1 ? `uniform float biomeEdges[${layers.length - 1}];\n` : ''}` : '') + 'varying vec3 planetPosition;\nuniform float planetSeed;\n' + noiseGLSL + '\n' + shader.fragmentShader.replace('#include <color_fragment>', `
+#include <color_fragment>
 vec3 terrain=normalize(planetPosition)*5.0+planetSeed;
 float land=planetNoise(terrain)*.65+planetNoise(terrain*2.13)*.25+planetNoise(terrain*4.27)*.10;
 ${layers.length ? `float biome=clamp(normalize(planetPosition).y*.5+.5,0.0,1.0);vec3 pigment=biomeColors[0];
 ${layers.slice(1).map((_,i)=>`pigment=mix(pigment,biomeColors[${i+1}],step(biomeEdges[${i}],biome));`).join('\n')}
 diffuseColor.rgb= pigment;` : ''}
-diffuseColor.rgb*=.48+smoothstep(.25,.75,land)*.75;`);
+diffuseColor.rgb*=.48+smoothstep(.25,.75,land)*.75;
+`);
   };
   material.customProgramCacheKey = () => `orbitfolio-terrain-v3-${layers.length}`;
   return material;
