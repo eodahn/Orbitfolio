@@ -163,6 +163,7 @@ export async function publicProject(
     languageBytes: JSON.parse(project.language_bytes_json || "{}"),
     githubUrl: project.github_url,
     demoUrl: project.demo_url,
+    externalUrl: project.demo_url,
     views: project.views,
     rating: project.rating,
     updatedAt: project.updated_at,

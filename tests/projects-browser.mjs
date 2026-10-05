@@ -466,12 +466,9 @@ try {
       exact: true,
     })
     .click();
-  await page
-    .getByRole("link", {
-      name: "Ir para o planeta Meu planeta manual",
-      exact: true,
-    })
-    .click();
+  assert.equal(await page.locator('[data-results] a[href*="?planet="]').count(),0);
+  await page.getByRole("heading", {name:"Meu planeta manual",exact:true}).click();
+  await page.getByRole("link", {name:"IR ATÉ O PLANETA",exact:true}).click();
   await page.waitForFunction(() => window.world?.running);
   assert.ok(
     await page.evaluate(
@@ -479,17 +476,14 @@ try {
       id,
     ),
   );
-  await page
-    .getByRole("dialog", {
-      name: "Informações do planeta",
-    })
-    .waitFor();
+  await page.waitForFunction(() => window.world?.running && !location.search);
+  assert.equal(await page.getByRole("dialog", {name:"Informações do planeta"}).count(),0);
   const arrived = await page.evaluate((id) => {
     const u = window.world,
       p = u.planets.find((p) => p.userData.project.id === id);
     return {
       distance: u.ship.position.distanceTo(p.position),
-      radius: p.userData.radius,
+      radius: p.userData.visualRadius,
       velocity: u.ship.userData.velocity.length(),
       safe: u.planets.every(
         (p) =>
@@ -500,12 +494,7 @@ try {
   }, id);
   assert.ok(arrived.safe && arrived.distance < arrived.radius + 65);
   assert.equal(arrived.velocity, 0);
-  await page
-    .getByRole("button", {
-      name: "Fechar projeto",
-      exact: true,
-    })
-    .click();
+
   await page.waitForFunction(() => !window.world.focus);
   await page
     .getByRole("link", {
@@ -523,23 +512,12 @@ try {
       exact: true,
     })
     .click();
-  await page
-    .getByRole("link", {
-      name: "Ir para o planeta Meu planeta manual",
-      exact: true,
-    })
-    .click();
-  await page
-    .getByRole("dialog", {
-      name: "Informações do planeta",
-    })
-    .waitFor();
-  await page
-    .getByRole("button", {
-      name: "Fechar projeto",
-      exact: true,
-    })
-    .click();
+  assert.equal(await page.locator('[data-results] a[href*="?planet="]').count(),0);
+  await page.getByRole("heading", {name:"Meu planeta manual",exact:true}).click();
+  await page.getByRole("link", {name:"IR ATÉ O PLANETA",exact:true}).click();
+  await page.waitForFunction(() => window.world?.running && !location.search);
+  assert.equal(await page.getByRole("dialog", {name:"Informações do planeta"}).count(),0);
+
   await page.waitForFunction(() => !window.world.focus);
   // Focus through the same callback used by a raycast click; controls must pause.
   const previous = await page.evaluate((id) => {

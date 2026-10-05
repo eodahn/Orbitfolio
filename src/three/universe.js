@@ -1,3 +1,5 @@
+import { containFlight, containCamera, clampWorld } from "./boundaries.js";
+import { findSafeApproach } from "./approach.js";
 import { FlightControls } from "./flight-controls.js";
 import { pickPlanetSystem } from "./planet-interaction.js";
 import { escapeHtml as e } from "../utils/html.js";
@@ -122,15 +124,15 @@ export class Universe {
         console.warn("Universo cheio: planeta não posicionado", project.id);
         continue;
       }
-      planet.userData.globalPosition = position.clone();
+      planet.userData.globalPosition = clampWorld(position.clone(),planet.userData.visualRadius);
       planet.userData.signature = signature;
       if (previousVelocity) planet.userData.velocity.copy(previousVelocity);
-      this.origin.globalToLocal(position, planet.position);
+      this.origin.globalToLocal(planet.userData.globalPosition, planet.position);
       this.planets.push(planet);
       this.scene.add(planet);
     }
     if (!this.spawned) {
-      const spawn = availablePosition(WORLD.shipRadius, this.planets);
+      const spawn = availablePosition(WORLD.shipRadius+WORLD.cameraMargin, this.planets.map(p=>({position:p.position,userData:{radius:p.userData.visualRadius}})));
       if (!spawn) throw new Error("Não há posição segura para a nave.");
       this.ship.position.copy(spawn);
       // Face the nearest project on first spawn so a random edge position never
@@ -239,8 +241,8 @@ export class Universe {
     this.moonAim = hit;
     this.moonTooltip.hidden = !hit;
     if (hit) {
-      const { language, percentage, estimated } = hit.object.userData;
-      this.moonTooltip.textContent = `${language} · ${estimated ? "≈ " : ""}${Number(percentage.toFixed(4))}%`;
+      const { language, percentage, estimated, members } = hit.object.userData;
+      this.moonTooltip.textContent = `${language} · ${estimated ? "≈ " : ""}${Number(percentage.toFixed(4))}%${members ? " · " + members.map(item=>item.name).join(", ") : ""}`;
     }
   }
   setAim(planet) {
@@ -279,59 +281,21 @@ export class Universe {
   teleportToPlanet(id) {
     const planet = this.planets.find((p) => p.userData.project.id === id);
     if (!planet) return false;
-    const clearance =
-      planet.userData.visualRadius + WORLD.shipRadius + WORLD.margin;
-    // Search rings around the current planet position, including camera clearance.
-    let target;
-    for (const extra of [0, 12, 24, 40]) {
-      for (let i = 0; i < 64; i++) {
-        const angle = (i * Math.PI * 2) / 64;
-        const candidate = planet.userData.globalPosition
-          .clone()
-          .add(
-            new THREE.Vector3(
-              Math.sin(angle),
-              0,
-              Math.cos(angle),
-            ).multiplyScalar(clearance + extra),
-          );
-        const camera = candidate
-          .clone()
-          .add(
-            candidate
-              .clone()
-              .sub(planet.userData.globalPosition)
-              .normalize()
-              .multiplyScalar(12),
-          )
-          .add(new THREE.Vector3(0, 4.3, 0));
-        const valid = (point, radius) =>
-          this.planets.every(
-            (p) =>
-              point.distanceTo(p.userData.globalPosition) >
-              p.userData.visualRadius + radius + 2,
-          );
-        if (valid(candidate, WORLD.shipRadius) && valid(camera, 1)) {
-          target = candidate;
-          break;
-        }
-      }
-      if (target) break;
-    }
-    if (!target) return false;
+    const approach=findSafeApproach(planet,this.planets,this.space);
+    if (!approach) return false;
+    const target=approach.position;
+    this.controls.release?.();
+    this.hovering=false;
     this.restoreFocus(true);
     this.keys.clear();
     this.origin.offset.copy(target);
     this.ship.position.set(0, 0, 0);
     this.syncWorld();
     this.ship.userData.velocity.set(0, 0, 0);
-    const direction = planet.userData.globalPosition.clone().sub(target);
-    this.ship.rotation.set(0, Math.atan2(-direction.x, -direction.z), 0);
+    this.ship.rotation.copy(approach.rotation);
     this.controls.yaw = this.ship.rotation.y;
-    this.controls.pitch = 0;
-    this.camera.position
-      .copy(this.ship.position)
-      .add(new THREE.Vector3(0, 4.3, 12).applyQuaternion(this.ship.quaternion));
+    this.controls.pitch = this.ship.rotation.x;
+    this.origin.globalToLocal(approach.camera,this.camera.position);
     this.camera.lookAt(planet.position);
     this.hasMoved = true;
     this.onFirstMovement();
@@ -354,6 +318,7 @@ export class Universe {
           this.camera.aspect,
         ),
       );
+    clampWorld(f.target.add(this.origin.offset),1).sub(this.origin.offset);
     const camera = this.camera.clone();
     camera.position.copy(f.target);
     camera.lookAt(p.position);
@@ -433,6 +398,8 @@ export class Universe {
       this.ship.userData.updateWarp?.(false, delta);
       this.updateWarpHud();
       this.updateFocus(delta);
+      containCamera(this.camera,this.origin.offset);
+      this.space.animate(delta,this.camera,this.origin.offset);
       for (const planet of this.planets) if (planet.visible) planet.update(delta, this.camera.position);
       this.renderer.render(this.scene, this.camera);
       this.frameId = requestAnimationFrame(this.frame);
@@ -443,7 +410,16 @@ export class Universe {
     const activePlanets = this.planets.filter(p => p.visible);
     for (let i = 0; i < steps; i++) {
       this.updateFlight(dt, false);
+      containFlight(this.ship,this.origin.offset,dt);
       stepPhysics([this.ship, ...activePlanets], dt, { bounded: false });
+      this.space.collide(this.ship,this.origin.offset);
+      containFlight(this.ship,this.origin.offset,0);
+      for(const planet of activePlanets) {
+        const global=this.origin.localToGlobal(planet.position);
+        const clamped=clampWorld(global.clone(),planet.userData.visualRadius);
+        for(const axis of ['x','y','z'])if(clamped[axis]!==global[axis])planet.userData.velocity[axis]=0;
+        this.origin.globalToLocal(clamped,planet.position);
+      }
     }
     this.ship.userData.updateWarp?.(this.warp.active, delta);
     this.updateWarpHud();
@@ -453,6 +429,8 @@ export class Universe {
       .clone()
       .add(new THREE.Vector3(0, 4.3, 12).applyQuaternion(this.ship.quaternion));
     this.camera.position.lerp(desired, 1 - Math.exp(-12 * delta));
+    containCamera(this.camera,this.origin.offset);
+    this.space.animate(delta,this.camera,this.origin.offset);
     this.camera.lookAt(
       this.ship.position
         .clone()

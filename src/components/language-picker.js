@@ -1,32 +1,10 @@
 import { bindCharacterCounts } from "./character-count.js";
 import { escapeHtml as e } from "../utils/html.js";
-export const LANGUAGES = Object.freeze([
-  "Python",
-  "JavaScript",
-  "Java",
-  "TypeScript",
-  "C#",
-  "C++",
-  "C",
-  "PHP",
-  "Ruby",
-  "Go",
-  "Swift",
-  "Kotlin",
-  "Rust",
-  "SQL",
-  "R",
-  "MATLAB",
-  "HTML/CSS",
-  "Dart",
-  "Scala",
-  "Perl",
-  "Objective-C",
-  "Shell/Bash",
-]);
+import { TECHNOLOGY_VISUALS, languageColor, normalizeLanguage } from '../../shared/technology-visuals.js';
+export const LANGUAGES=Object.freeze([...Object.keys(TECHNOLOGY_VISUALS),'MATLAB','Objective-C','Groovy','Visual Basic','COBOL','Prolog','Lisp']);
 export function chooseLanguage(existing = []) {
   return new Promise((resolve) => {
-    const used = new Set(existing.map((name) => name.trim().toLowerCase())),
+    const used = new Set(existing.map((name) => normalizeLanguage(name))),
       dialog = document.createElement("dialog");
     dialog.className = "language-picker confirm-dialog";
     dialog.setAttribute("aria-labelledby", "language-picker-title");
@@ -41,7 +19,7 @@ export function chooseLanguage(existing = []) {
           "Informe o nome da linguagem, por exemplo Lua.";
         return;
       }
-      if (used.has(name.toLowerCase())) {
+      if (used.has(normalizeLanguage(name))) {
         dialog.querySelector("[data-error]").textContent =
           "Essa linguagem já foi adicionada.";
         return;
@@ -60,7 +38,7 @@ export function chooseLanguage(existing = []) {
       ]
         .map(
           (name) =>
-            `<button type="button" class="language-option ${used.has(name.toLowerCase()) ? "is-selected" : ""}" ${used.has(name.toLowerCase()) ? "disabled" : ""} data-language="${e(name)}">${e(name)}${used.has(name.toLowerCase()) ? " · adicionada" : ""}</button>`,
+            `<button type="button" style="border-left:4px solid ${languageColor(name)}" class="language-option ${used.has(normalizeLanguage(name)) ? "is-selected" : ""}" ${used.has(normalizeLanguage(name)) ? "disabled" : ""} data-language="${e(name)}">${e(name)}${used.has(normalizeLanguage(name)) ? " · adicionada" : ""}</button>`,
         )
         .join("");
     };

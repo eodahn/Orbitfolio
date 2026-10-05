@@ -188,22 +188,22 @@ try {
     ).projects.some((p) => p.name === "Formulário preservado"),
   );
   await page.goto(base + "/explore");
-  await page.getByRole("heading", { name: "Folio 2019", exact: true }).click();
+  await page.getByRole("heading", { name: "Portfolio v4", exact: true }).click();
   assert.equal(
     await page
       .getByRole("link", { name: "Acessar projeto", exact: true })
       .getAttribute("href"),
-    "https://2019.bruno-simon.com/",
+    "https://v4.brittanychiang.com/",
   );
   assert.equal(
     await page
       .getByRole("link", { name: "Acessar GitHub", exact: true })
       .getAttribute("href"),
-    "https://github.com/brunosimon/folio-2019",
+    "https://github.com/bchiang7/v4",
   );
-  await page.getByRole("link", { name: "Bruno Simon", exact: true }).click();
+  await page.getByRole("link", { name: "Brittany Chiang", exact: true }).click();
   await page
-    .getByRole("heading", { name: "Bruno Simon", exact: true })
+    .getByRole("heading", { name: "Brittany Chiang", exact: true })
     .waitFor();
   // Instrument only the test page: Pointer Lock cannot depend on desktop focus in CI.
   await page.evaluate(async () => {

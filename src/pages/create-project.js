@@ -1,3 +1,4 @@
+import { languageColor } from "../../shared/technology-visuals.js";
 import { bindCharacterCounts } from "../components/character-count.js";
 import { oauthMessages } from "../../shared/oauth-errors.js";
 import { chooseLanguage } from "../components/language-picker.js";
@@ -152,7 +153,7 @@ export async function renderCreateProject(root) {
     const rows = root.querySelector("[data-language-rows]");
     const add = (name = "", value = null) => {
       const row = document.createElement("tr");
-      row.innerHTML = `<td><input aria-label="Linguagem" readonly maxlength="50" required value="${e(name)}"></td><td><input aria-label="Porcentagem" type="number" min="0" max="100" step="any" value="${value == null ? "" : Number(value)}"></td><td><button class="button" type="button" aria-label="Remover linguagem">Remover</button></td>`;
+      row.innerHTML = `<td style="border-left:4px solid ${languageColor(name)}"><input aria-label="Linguagem" readonly maxlength="50" required value="${e(name)}"></td><td><input aria-label="Porcentagem" type="number" min="0" max="100" step="any" value="${value == null ? "" : Number(value)}"></td><td><button class="button" type="button" aria-label="Remover linguagem">Remover</button></td>`;
       row.querySelector("button").onclick = () => row.remove();
       rows.append(row);
     };

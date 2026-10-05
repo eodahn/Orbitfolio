@@ -1,7 +1,10 @@
 export const WORLD = Object.freeze({
-  min: -320,
-  max: 320,
+  min: -960,
+  max: 960,
   margin: 8,
+  boundaryZone: 96,
+  cameraMargin: 16,
+  safeApproachMargin: 12,
   shipRadius: 3,
   shipMass: 10,
   minRadius: 6,

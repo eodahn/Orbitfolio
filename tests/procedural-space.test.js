@@ -10,7 +10,7 @@ import { projectRadius } from '../src/three/world.js';
 import { pickPlanetSystem } from '../src/three/planet-interaction.js';
 import { Universe } from '../src/three/universe.js';
 const close=(a,b,eps=1e-8)=>assert.ok(Math.abs(a-b)<eps,`${a} ≠ ${b}`);
-const project={id:'real-api-project',sizeBytes:1234567,orbit:[40,20,-100],languages:{HTML:50,JavaScript:25,CSS:25}};
+const project={id:'real-api-project',sizeBytes:1234567,orbit:[40,20,-100],languages:{HTML:50,Python:25,Go:25}};
 
 test('language bytes win over percentages; aliases merge, missing/invalid/extreme values stay finite',()=>{
   const parsed=parseProjectLanguages({languages:{HTML:100},languageBytes:{JS:300,javascript:100,CSS:100}});
@@ -43,7 +43,7 @@ test('long travel keeps chunk budget bounded, disposes exclusive resources and r
   let disposed=0,sharedDisposed=0;
   space.chunks.get('0,0,0').geometry.addEventListener('dispose',()=>disposed++);
   space.rockGeometry.addEventListener('dispose',()=>sharedDisposed++);
-  for(let i=1;i<=40;i++){space.update(new THREE.Vector3(i*1024,-i*256,i*512),new THREE.Vector3(i*1024,-i*256,i*512));assert.equal(space.chunks.size,27);assert.equal(scene.children.length,27);for(const chunk of space.chunks.values())assert.ok(chunk.group.position.length()<1000);}
+  for(let i=1;i<=40;i++){space.update(new THREE.Vector3(i*1024,-i*256,i*512),new THREE.Vector3(i*1024,-i*256,i*512));assert.equal(space.chunks.size,27);assert.equal(scene.children.length,29);for(const chunk of space.chunks.values())assert.ok(chunk.group.position.length()<1000);}
   assert.equal(disposed,1);assert.equal(sharedDisposed,0);
   space.update(origin);assert.deepEqual(Array.from(space.chunks.get('0,0,0').geometry.attributes.position.array),original);
   space.dispose();assert.equal(scene.children.length,0);assert.equal(sharedDisposed,1);
@@ -69,7 +69,7 @@ test('PlanetSystem keeps project sizes, exact palette, deterministic non-overlap
   a.update(0,new THREE.Vector3());assert.equal(a.orbits[0].group.visible,true);
   let released=0;a.userData.surface.geometry.addEventListener('dispose',()=>released++);
   a.dispose();assert.equal(released,0);b.dispose();assert.equal(released,1);
-  assert.equal(ringEligible(project),false);assert.equal(ringEligible({...project,frameworksOrTools:['Docker']}),true);assert.equal(ringEligible({...project,views:1500}),true);
+  assert.equal(ringEligible(project),false);assert.equal(ringEligible({...project,languages:{Dockerfile:100}}),true);assert.equal(ringEligible({...project,views:1500}),false);
 });
 test('raycast distinguishes moon metadata, surface and hidden/distant systems',()=>{
   const planet=new PlanetSystem(project),camera=new THREE.PerspectiveCamera(58,1,.1,1000),ray=new THREE.Raycaster();

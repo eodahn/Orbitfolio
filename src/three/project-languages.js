@@ -1,29 +1,5 @@
-import { hash } from "../utils/seed.js";
-export const LANGUAGE_COLORS = Object.freeze({
-  HTML:'#e34c26', CSS:'#563d7c', JavaScript:'#f1e05a', TypeScript:'#3178c6',
-  SCSS:'#c6538c', SASS:'#c6538c', Vue:'#41b883', Svelte:'#ff3e00', WebAssembly:'#654ff0',
-  Python:'#3572A5', Java:'#b07219', C:'#555555', 'C++':'#f34b7d', 'C#':'#178600',
-  PHP:'#4F5D95', Ruby:'#701516', Go:'#00ADD8', Rust:'#dea584', Kotlin:'#A97BFF',
-  Swift:'#F05138', Elixir:'#6e4a7e', Scala:'#c22d40', Dart:'#00B4AB', Lua:'#000080',
-  R:'#198CE7', Julia:'#a270ba', Perl:'#0298c3', Haskell:'#5e5086', Clojure:'#db5855',
-  Erlang:'#B83998', Zig:'#ec915c', Nim:'#ffc200', OCaml:'#3be133', Fortran:'#4d41b1',
-  Assembly:'#6E4C13', Shell:'#89e051', Bash:'#89e051', PowerShell:'#012456',
-  Dockerfile:'#384d54', Makefile:'#427819', Nix:'#7e78d5', SQL:'#e38c00',
-  PostgreSQL:'#e38c00', MySQL:'#e38c00', PLpgSQL:'#336791', GraphQL:'#e10098',
-  Markdown:'#083fa1', JSON:'#292929', YAML:'#cb171e', TeX:'#3D6117', LaTeX:'#3D6117',
-  Outros:'#8b91a4', Unknown:'#748399',
-});
-const names = new Map(Object.keys(LANGUAGE_COLORS).map(name=>[name.toLowerCase(),name]));
-const aliases = {js:'JavaScript',ts:'TypeScript',csharp:'C#',cpp:'C++',bash:'Shell','shell/bash':'Shell',yml:'YAML',latex:'TeX'};
-export function normalizeLanguage(value) {
-  const name = typeof value === 'string' ? value.trim() : '';
-  const key = name.toLowerCase();
-  return (Object.hasOwn(aliases, key) ? aliases[key] : null) || names.get(key) || key;
-}
-export function languageColor(name) {
-  const canonical = normalizeLanguage(name);
-  return (Object.hasOwn(LANGUAGE_COLORS, canonical) ? LANGUAGE_COLORS[canonical] : null) || `hsl(${hash(canonical)%360}, 55%, 57%)`;
-}
+import { LANGUAGE_COLORS, normalizeLanguage, languageColor } from "../../shared/technology-visuals.js";
+export { LANGUAGE_COLORS, normalizeLanguage, languageColor } from "../../shared/technology-visuals.js";
 const amount = value => {
   if (value == null || typeof value === 'boolean' || value === '') return null;
   const n = Number(value);

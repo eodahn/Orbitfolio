@@ -54,12 +54,13 @@ async function requestedPlanet() {
   if (!id) return;
   // Consume once: normal back/forward navigation must preserve subsequent flight.
   history.replaceState(history.state, "", "/");
+  closeHomeProject(true);
+  universe.controls.release();
   if (!universe.teleportToPlanet(id)) {
     toast("Planeta indisponível ou sem espaço seguro para chegar.", "error");
     return;
   }
-  const planet = universe.planets.find((p) => p.userData.project.id === id);
-  await openHomeProject(planet.userData.project);
+  // Arrival returns to flight; opening details is always a separate user action.
 }
 async function startHome() {
   // Render the canvas and HUD immediately; network/model loading must not hold the loop.

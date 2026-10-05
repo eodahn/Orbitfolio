@@ -34,7 +34,7 @@ export function projectLinks(project) {
       project.githubUrl || project.repositoryUrl,
     ),
     external =
-      safeHttpUrl(project.demoUrl) ||
+      safeHttpUrl(project.externalUrl || project.demoUrl) ||
       (!github ? safeHttpUrl(project.repositoryUrl) : "");
   return { github, external, primary: external || github };
 }

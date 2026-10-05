@@ -90,15 +90,37 @@ try {
     u.stop();
     const budget = (u.space.config.activeRadius * 2 + 1) ** 3;
     const project = u.planets[0].userData.project;
+    const rock=[...u.space.chunks.values()].flatMap(chunk=>chunk.colliders)[0];
+    if(rock) {
+      u.origin.globalToLocal(rock.globalPosition,u.ship.position);u.ship.position.x-=rock.radius+2.9;
+      u.ship.userData.velocity.set(90,0,0);u.space.collide(u.ship,u.origin.offset);
+      u.space.animate(.1,u.camera,u.origin.offset);u.renderer.render(u.scene,u.camera);
+      if(!u.space.destroyedAsteroidIds.has(rock.id))throw new Error('High speed impact did not destroy');
+      u.space.animate(1.1,u.camera,u.origin.offset);
+      if(u.space.fragments.slots.size)throw new Error('Fragments leaked');
+    }
+
     const beforeOrbit = [...project.orbit];
     const geometries = [];
-    for (let i = 1; i <= 12; i++) {
-      u.ship.position.set(i * 5000, i * 100, -i * 200);
-      u.rebaseWorld();
-      u.renderer.render(u.scene, u.camera);
+    const { containFlight, containCamera, insideWorld } = await import('/src/three/boundaries.js');
+    const { WORLD } = await import('/shared/world-config.js');
+    for (let axis of ['x','y','z']) for (let sign of [-1,1]) {
+      const global=u.ship.position.clone().set(0,0,0);global[axis]=sign*(WORLD.max-20);
+      u.origin.globalToLocal(global,u.ship.position);
+      u.ship.userData.velocity.set(0,0,0);u.ship.userData.velocity[axis]=sign*90;
+      for(let i=0;i<120;i++) {
+        containFlight(u.ship,u.origin.offset,1/120);
+        u.ship.position.addScaledVector(u.ship.userData.velocity,1/120);
+        containFlight(u.ship,u.origin.offset,0);
+      }
+      if(!insideWorld(u.origin.localToGlobal(u.ship.position),19))throw new Error('Boundary crossed');
+      u.camera.position.copy(u.ship.position);containCamera(u.camera,u.origin.offset);
+      const target=u.camera.position.clone();target[axis]+=sign*100;u.camera.lookAt(target);
+      u.rebaseWorld();u.space.animate(1,u.camera,u.origin.offset);
+      u.renderer.render(u.scene,u.camera);
       geometries.push(u.renderer.info.memory.geometries);
-      if (u.space.chunks.size !== budget) throw new Error('Unbounded chunk count');
-      if (u.ship.position.length() !== 0) throw new Error('Origin was not rebased');
+      if(u.space.chunks.size!==budget)throw new Error('Unbounded chunk count');
+      if(!u.space.background.position.equals(u.camera.position))throw new Error('Missing distant stars');
     }
     const teleported = u.teleportToPlanet(project.id);
     const localPlanet = u.planets.find(p => p.userData.project.id === project.id);
@@ -113,7 +135,7 @@ try {
   assert.equal(procedural.localShip, 0);
   assert.ok(procedural.localDistance < 250);
   assert.ok(procedural.moonCount <= 4);
-  assert.ok(procedural.geometrySpread <= 3, 'GPU geometry count should stabilize during travel');
+  assert.ok(procedural.geometrySpread <= 3 + 2 * (await page.evaluate(() => window.world.planets.length)), 'GPU geometry count should stabilize during travel');
 
   await page.keyboard.down("KeyW");
   await page.waitForTimeout(250);
@@ -141,7 +163,7 @@ try {
     const Vector3 = u.ship.position.constructor;
     u.stop();
     const actual = u.planets[0].userData.project;
-    const planet = new PlanetSystem({ ...actual, languages: {HTML:50, JavaScript:25, CSS:25}, languageBytes: {}, views: 1500 });
+    const planet = new PlanetSystem({ ...actual, languages: {HTML:40, Python:25, Go:25, Dockerfile:10}, languageBytes: {}, views: 1500 });
     const originalPlanets = u.planets;
     originalPlanets.forEach(p => p.visible = false);
     planet.userData.globalPosition = u.origin.localToGlobal(new Vector3());

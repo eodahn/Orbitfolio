@@ -64,14 +64,14 @@ export async function ensureOrbits(db) {
       x: p.orbit_x,
       y: p.orbit_y,
       z: p.orbit_z,
-      r: projectRadius(p.size_bytes),
+      r: projectRadius(p.size_bytes)*4.6,
     }));
   const update = db.prepare(
     "UPDATE projects SET orbit_x=?,orbit_y=?,orbit_z=? WHERE id=?",
   );
   for (const p of rows.filter((p) => p.orbit_x == null)) {
     const rng = random(hash(p.id)),
-      r = projectRadius(p.size_bytes),
+      r = projectRadius(p.size_bytes)*4.6,
       valid = (q) =>
         bodies.every(
           (b) =>
