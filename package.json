@@ -27,7 +27,8 @@
     "test:postgres": "node tests/postgres.mjs",
     "test:startup": "node tests/startup-postgres.mjs",
     "seed:demo": "node scripts/seed-showcase.mjs",
-    "test:features": "node tests/features-browser.mjs"
+    "test:features": "node tests/features-browser.mjs",
+    "test:mobile": "node tests/mobile-browser.mjs"
   },
   "dependencies": {
     "busboy": "^1.6.0",

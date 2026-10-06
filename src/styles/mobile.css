@@ -1,0 +1,90 @@
+/* Additive touch presentation. No selector applies to the desktop input mode. */
+.touch-mode { --touch-top: calc(120px + env(safe-area-inset-top, 0px)); }
+.touch-mode .topbar {
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  left: calc(8px + env(safe-area-inset-left, 0px));
+  right: calc(8px + env(safe-area-inset-right, 0px));
+  display: grid; grid-template-columns: 1fr auto auto; gap: 0 8px;
+  padding: 4px 10px; min-height: 96px;
+}
+.touch-mode .topbar nav { grid-column: 1 / -1; grid-row: 2; gap: 18px; width: 100%; }
+.touch-mode .topbar nav a { display: inline-flex; align-items: center; min-height: 44px; flex-shrink: 0; }
+.touch-mode .account-orb, .touch-mode .search-nav { width: 44px; height: 44px; }
+.touch-mode .social-moon, .touch-mode .featured-fab { top: var(--touch-top); bottom: auto; min-height: 44px; padding: 10px 12px; }
+.touch-mode .social-moon { left: calc(12px + env(safe-area-inset-left, 0px)); right: auto; }
+.touch-mode .featured-fab { right: calc(12px + env(safe-area-inset-right, 0px)); }
+.touch-mode .panel-close { top: calc(var(--touch-top) + 52px); right: calc(12px + env(safe-area-inset-right, 0px)); }
+.touch-mode .page {
+  min-height: 100dvh; padding: calc(var(--touch-top) + 110px) max(16px, env(safe-area-inset-right, 0px)) calc(32px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.touch-mode .page-heading { flex-wrap: wrap; align-items: start; gap: 16px; margin-bottom: 24px; }
+.touch-mode .page h1, .touch-mode .project-info h1 { font-size: clamp(30px, 7vw, 44px); letter-spacing: -1px; overflow-wrap: anywhere; }
+.touch-mode .project-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); overflow: visible; }
+.touch-mode .project-card { min-width: 0; padding: 16px; gap: 12px; }
+.touch-mode .project-card .planet-preview { width: 72px; height: 72px; }
+.touch-mode .project-view, .touch-mode .progress-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; overflow: visible; }
+.touch-mode .project-view > *, .touch-mode .progress-layout > *, .touch-mode .profile-heading > * { min-width: 0; }
+.touch-mode .profile-heading { flex-wrap: wrap; gap: 16px; }
+.touch-mode .profile-tabs { flex-wrap: wrap; overflow: visible; }
+.touch-mode .profile-tabs .button { flex: 0 1 auto; }
+.touch-mode .button, .touch-mode .period-tabs button, .touch-mode .language-option { min-height: 44px; }
+.touch-mode :is(input, select, textarea) { font-size: 16px; max-width: 100%; }
+.touch-mode :is(.profile-form, .auth-card, .state-card) { width: 100%; min-width: 0; }
+.touch-mode .profile-form fieldset { min-width: 0; }
+.touch-mode :is(.project-info, .lead, .state-card, .notice, .repository-option) { overflow-wrap: anywhere; }
+.touch-mode .auth-card, .touch-mode .state-card { padding: 20px; }
+.touch-mode .global-search > div, .touch-mode .repository-option { flex-wrap: wrap; }
+.touch-mode .language-table { table-layout: fixed; }
+.touch-mode .language-table td, .touch-mode .language-table th { overflow-wrap: anywhere; }
+.touch-mode .language-table td:last-child { width: 86px; }
+.touch-mode .language-table .button { padding: 8px 6px; max-width: 100%; }
+.touch-mode .language-bars > div { grid-template-columns: minmax(74px, 100px) minmax(0, 1fr) 42px; gap: 6px; }
+.touch-mode .stat-row { flex-wrap: wrap; }
+.touch-mode .confirm-dialog {
+  max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  max-width: calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+  padding: 18px; overflow-y: auto; overscroll-behavior: contain;
+}
+.touch-mode .avatar-crop { width: min(220px, 100%); height: auto; aspect-ratio: 1; }
+.touch-mode .home-project-panel {
+  top: calc(var(--touch-top) + 54px); bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  left: calc(12px + env(safe-area-inset-left, 0px)); right: calc(12px + env(safe-area-inset-right, 0px));
+  width: auto; min-width: 0; max-width: none; padding: 18px; overscroll-behavior: contain;
+}
+.touch-mode .has-project .universe-page canvas { top: 0; width: 100%; height: 100%; }
+.touch-mode .has-project .universe-page::after { display: none; }
+.touch-mode .universe-page { height: 100dvh; }
+.touch-mode .home-intro { top: calc(var(--touch-top) + 70px); left: 20px; width: calc(100vw - 40px); transform: none; }
+.touch-mode .home-intro h1 { font-size: clamp(30px, 7vw, 44px); }
+.touch-mode .home-intro > p:last-child { max-width: 320px; margin-top: 12px; }
+.touch-mode .flight-hud, .touch-mode .navigation-hud { display: none; }
+.touch-mode .warp-hud { left: calc(16px + env(safe-area-inset-left, 0px)); top: auto; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); transform: none; gap: 6px; }
+.touch-mode .warp-track { height: 80px; width: 18px; }
+.touch-mode .has-project :is(.touch-controls, .warp-hud) { display: none; }
+.touch-mode .toast-region { left: 12px; right: 12px; bottom: calc(208px + env(safe-area-inset-bottom, 0px)); pointer-events: none; }
+.touch-mode .toast { max-width: 100%; }
+.touch-mode .touch-controls {
+  position: fixed; z-index: 10; display: flex; align-items: end; gap: 14px;
+  right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  pointer-events: none; user-select: none; -webkit-user-select: none;
+}
+.touch-mode .touch-controls[hidden] { display: none; }
+.touch-mode .touch-buttons { display: grid; gap: 8px; }
+.touch-mode .touch-controls button, .touch-mode .touch-stick {
+  pointer-events: auto; touch-action: none; border: 1px solid #c0b4ff80; color: #fff;
+  background: #19162dcc; box-shadow: 0 3px 18px #0006;
+}
+.touch-mode .touch-controls button { min-height: 48px; min-width: 84px; border-radius: 14px; padding: 8px; font-size: 14px; }
+.touch-mode .touch-controls small { display: block; color: #d5cff0; font-size: 11px; }
+.touch-mode .touch-controls .is-pressed { background: #55419ee6; border-color: #9cf1ff; }
+.touch-mode .touch-stick { width: 132px; height: 132px; border-radius: 50%; display: grid; place-items: center; }
+.touch-mode .touch-stick-knob { width: 50px; height: 50px; border-radius: 50%; background: #b2a4ffbd; border: 1px solid #e4ddff; pointer-events: none; }
+@media (orientation: landscape) and (min-width: 600px) {
+  .touch-mode { --touch-top: calc(72px + env(safe-area-inset-top, 0px)); }
+  .touch-mode .topbar { grid-template-columns: auto minmax(0, 1fr) auto auto; min-height: 52px; }
+  .touch-mode .topbar nav { grid-column: 2; grid-row: 1; }
+  .touch-mode .home-intro { top: calc(var(--touch-top) + 54px); width: min(360px, 48vw); }
+  .touch-mode .home-intro h1 { font-size: 30px; }
+  .touch-mode .home-intro > p:last-child { font-size: 12px; }
+  .touch-mode .touch-stick { width: 116px; height: 116px; }
+}

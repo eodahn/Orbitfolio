@@ -1,5 +1,7 @@
 import { containFlight, containCamera, clampWorld } from "./boundaries.js";
 import { findSafeApproach } from "./approach.js";
+import { MobileFlightControls } from "./mobile-flight-controls.js";
+import { isTouchMode } from "../input/touch-mode.js";
 import { FlightControls } from "./flight-controls.js";
 import { pickPlanetSystem } from "./planet-interaction.js";
 import { escapeHtml as e } from "../utils/html.js";
@@ -177,7 +179,7 @@ export class Universe {
     this.moonTooltip.className = "language-tooltip";
     this.moonTooltip.hidden = true;
     this.canvas.parentElement.append(this.moonTooltip);
-    this.controls = new FlightControls(this.canvas, {
+    const controlOptions = {
       canNavigate: () => this.running && !this.focus,
       onCanvasClick: event => this.fallbackClick(event),
       onMode: (active) => {
@@ -200,8 +202,26 @@ export class Universe {
           this.onFirstMovement();
         }
       },
-    });
-    this.keys = this.controls.keys;
+    };
+    this.inputModeListener = () => {
+      const mobile = isTouchMode();
+      if (this.controls && mobile === this.mobileMode) return;
+      const yaw = this.ship.rotation.y, pitch = this.ship.rotation.x;
+      this.controls?.dispose();
+      this.mobileMode = mobile;
+      this.controls = new (mobile ? MobileFlightControls : FlightControls)(this.canvas, controlOptions);
+      this.controls.yaw = yaw; this.controls.pitch = pitch;
+      this.keys = this.controls.keys;
+      this.hud.hidden = true;
+      const hint = this.canvas.parentElement.querySelector('[data-flight-hint] > p:last-child');
+      if (hint) {
+        this.desktopHint ??= hint.textContent;
+        hint.textContent = mobile ? 'Use o analógico para pilotar. Toque nos planetas para explorar; segure Dobra para acelerar.' : this.desktopHint;
+      }
+      this.resize();
+    };
+    this.inputModeListener();
+    document.addEventListener('orbitfolio:input-mode', this.inputModeListener);
     this.resizeListener = () => this.resize();
     addEventListener("resize", this.resizeListener);
     this.pointerEvent = event => {
@@ -378,7 +398,7 @@ export class Universe {
     if (this.controls.navigation)
       this.ship.rotation.set(this.controls.pitch, this.controls.yaw, 0, "YXZ");
     const active = this.warp.update(this.keys.has("ShiftLeft") || this.keys.has("ShiftRight"), delta);
-    updateFlightVelocity(this.ship.userData.velocity, this.ship.quaternion, this.keys, active, delta);
+    updateFlightVelocity(this.ship.userData.velocity, this.ship.quaternion, this.keys, active, delta, this.controls.axes);
     if (effects) { this.ship.userData.updateWarp?.(active, delta); this.updateWarpHud(); }
   }
   updateWarpHud() {
@@ -391,6 +411,7 @@ export class Universe {
   }
   frame = () => {
     if (!this.running) return;
+    this.controls.refresh?.();
     // Preserve elapsed flight time down to 4 FPS; cap long stalls/tab suspension.
     const delta = Math.min(this.clock.getDelta(), 0.25);
     if (this.focus) {
@@ -464,6 +485,7 @@ export class Universe {
   dispose() {
     this.stop();
     this.controls.dispose();
+    document.removeEventListener("orbitfolio:input-mode", this.inputModeListener);
     removeEventListener("resize", this.resizeListener);
     this.canvas.removeEventListener("pointermove", this.hoverListener);
     this.canvas.removeEventListener("pointerleave", this.leaveListener);

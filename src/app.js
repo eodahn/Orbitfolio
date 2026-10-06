@@ -4,6 +4,8 @@ import { startPlanetPreviews } from "./three/preview.js";
 import "./styles/main.css";
 import "./styles/auth.css";
 import "./styles/states.css";
+import "./styles/mobile.css";
+import { watchTouchMode } from "./input/touch-mode.js";
 import {
   registerRoute,
   renderCurrent,
@@ -26,6 +28,13 @@ import {
   renderProfile,
 } from "./pages/account.js";
 const root = document.querySelector("#app");
+const startTouchMode = () => watchTouchMode(active => {
+  document.documentElement.classList.toggle('touch-mode', active);
+  document.dispatchEvent(new Event('orbitfolio:input-mode'));
+});
+let stopTouchMode = startTouchMode();
+addEventListener('pagehide', () => stopTouchMode());
+addEventListener('pageshow', event => { if (event.persisted) stopTouchMode = startTouchMode(); });
 setRouterErrorHandler(() => {
   root.innerHTML = `<main class="fatal-state"><p class="eyebrow">SINAL INTERROMPIDO</p><h1>Não foi possível carregar esta órbita.</h1><p>Verifique a conexão com a API e tente novamente.</p><a class="button button-primary" href="/">Voltar ao início</a></main>`;
 });
