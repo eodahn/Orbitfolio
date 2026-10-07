@@ -140,3 +140,69 @@ test('mobile remount removes old tap listeners and three-finger gestures are not
   assert.equal(taps,1);assert.equal(h.counts().taps,0);
   next.dispose();event(h.canvas,'pointerdown');event(h.canvas,'pointerup');assert.equal(taps,1);
 });
+
+test('canvas horizontal, vertical and diagonal drags control flight look, never raycast or thrust',()=>{
+  for(const [dx,dy] of [[30,0],[0,30],[30,30]]) {
+    const h=harness();
+    event(h.canvas,'pointerdown');event(h.canvas,'pointermove',{clientX:60+dx,clientY:60+dy});
+    assert.equal(h.controls.yaw!==0,dx!==0);assert.equal(h.controls.pitch!==0,dy!==0);
+    event(h.canvas,'pointerup',{clientX:60+dx,clientY:60+dy});
+    assert.equal(h.counts().taps,0);assert.equal(h.counts().locks,0);
+    assert.deepEqual(h.controls.axes,{x:0,z:0});assert.equal(h.controls.keys.size,0);
+    h.controls.dispose();
+  }
+});
+
+test('touch pitch clamp equals desktop; taps tolerate small motion but drags returning to origin do not select',async()=>{
+  const {MAX_PITCH}=await import('../src/three/flight-look.js');
+  const h=harness();
+  event(h.canvas,'pointerdown');event(h.canvas,'pointermove',{clientY:-100000});assert.equal(h.controls.pitch,MAX_PITCH);
+  event(h.canvas,'pointermove',{clientY:100000});assert.equal(h.controls.pitch,-MAX_PITCH);
+  event(h.canvas,'pointermove');event(h.canvas,'pointerup');assert.equal(h.counts().taps,0);
+  const yaw=h.controls.yaw, pitch=h.controls.pitch;
+  event(h.canvas,'pointerdown');event(h.canvas,'pointermove',{clientX:63});event(h.canvas,'pointerup',{clientX:63});
+  assert.equal(h.counts().taps,1);assert.equal(h.controls.yaw,yaw);assert.equal(h.controls.pitch,pitch);
+  h.controls.dispose();
+});
+
+test('independent camera, joystick and button pointers; cancelling look never releases other fingers',()=>{
+  const h=harness();
+  event(h.stick,'pointerdown',{pointerId:1,clientY:0});
+  for(const [i,key] of [[0,'Space'],[1,'ControlLeft'],[2,'ShiftLeft']]) {
+    event(h.buttons[i],'pointerdown',{pointerId:3});
+    event(h.canvas,'pointerdown',{pointerId:2});event(h.canvas,'pointermove',{pointerId:2,clientX:100});
+    assert.equal(h.controls.axes.z,-1);assert.ok(h.controls.keys.has(key));assert.notEqual(h.controls.yaw,0);
+    event(h.canvas,'pointercancel',{pointerId:2});
+    const yaw=h.controls.yaw;event(h.canvas,'pointermove',{pointerId:2,clientX:200});assert.equal(h.controls.yaw,yaw);
+    assert.equal(h.controls.axes.z,-1);assert.ok(h.controls.keys.has(key));
+    event(h.buttons[i],'pointerup',{pointerId:3});
+  }
+  const yaw=h.controls.yaw;
+  event(h.stick,'pointermove',{pointerId:1,clientX:120});event(h.root,'pointermove',{clientX:300});
+  assert.equal(h.controls.yaw,yaw);
+  event(h.stick,'pointerup',{pointerId:1});h.controls.dispose();
+});
+
+test('UI, capture loss, visibility and unmount clear camera capture without phantom taps',()=>{
+  for(const type of ['lostpointercapture','orbitfolio:ui','visibilitychange','dispose']) {
+    const h=harness();event(h.canvas,'pointerdown');event(h.canvas,'pointermove',{clientX:100});
+    if(type==='dispose')h.controls.dispose();
+    else event(type==='lostpointercapture'?h.canvas:h.doc,type);
+    assert.equal(h.controls.taps.size,0);assert.equal(h.canvas.captured.size,0);
+    const yaw=h.controls.yaw;event(h.canvas,'pointermove',{clientX:200});event(h.canvas,'pointerup');
+    assert.equal(h.controls.yaw,yaw);assert.equal(h.counts().taps,0);
+    h.modal(true);event(h.canvas,'pointerdown');event(h.canvas,'pointermove',{clientX:200});assert.equal(h.controls.yaw,yaw);
+    h.controls.dispose();
+  }
+});
+
+test('shared mouse look calculation is numerically identical to the original desktop math',async()=>{
+  const {applyLookDelta,MAX_PITCH,MOUSE_SENSITIVITY}=await import('../src/three/flight-look.js');
+  assert.equal(MOUSE_SENSITIVITY,.0022);
+  const actual={yaw:0,pitch:0}, expected={yaw:0,pitch:0};
+  for(const [dx,dy] of [[100,40],[-500,100000],[10000,-100000],[-32,18]]) {
+    expected.yaw-=dx*.0022;expected.yaw=Math.atan2(Math.sin(expected.yaw),Math.cos(expected.yaw));
+    expected.pitch=Math.max(-MAX_PITCH,Math.min(MAX_PITCH,expected.pitch-dy*.0022));
+    applyLookDelta(actual,dx,dy,MOUSE_SENSITIVITY);assert.deepEqual(actual,expected);
+  }
+});

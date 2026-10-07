@@ -1,4 +1,7 @@
+import { applyLookDelta } from './flight-look.js';
 import { isTyping } from './flight-controls.js';
+export const TOUCH_LOOK_SENSITIVITY = .004; // radians per CSS pixel, independent of desktop
+export const TOUCH_DRAG_THRESHOLD = 10;
 
 export function joystickAxes(dx, dy, radius, deadzone = .12) {
   const distance = Math.hypot(dx, dy), amount = Math.min(1, distance / Math.max(1, radius));
@@ -35,23 +38,40 @@ export class MobileFlightControls {
     for (const button of this.root.querySelectorAll('[data-flight-key]')) this.bindControl(button, button.dataset.flightKey);
     this.listen(canvas, 'pointerdown', event => {
       if (this.blocked() || event.button !== 0) return;
-      // A second finger on the canvas is a gesture, not an object tap.
       this.canvasPointers.add(event.pointerId);
-      if (this.canvasPointers.size > 1) { this.taps.clear(); return; }
-      this.taps.set(event.pointerId, { x:event.clientX, y:event.clientY, time:event.timeStamp });
+      // One camera finger; additional canvas fingers suppress taps, never zoom.
+      if (this.canvasPointers.size > 1) {
+        for (const gesture of this.taps.values()) gesture.tapEligible = false;
+        return;
+      }
+      this.taps.set(event.pointerId, { x:event.clientX, y:event.clientY,
+        lastX:event.clientX, lastY:event.clientY, time:event.timeStamp, dragging:false, tapEligible:true });
+      canvas.setPointerCapture(event.pointerId);
     });
     this.listen(canvas, 'pointermove', event => {
-      const start = this.taps.get(event.pointerId);
-      if (start && Math.hypot(event.clientX-start.x,event.clientY-start.y)>10) this.taps.delete(event.pointerId);
+      const gesture = this.taps.get(event.pointerId);
+      if (!gesture) return;
+      if (this.blocked()) { this.endCameraPointer(event.pointerId); return; }
+      if (!gesture.dragging && Math.hypot(event.clientX-gesture.x,event.clientY-gesture.y)>TOUCH_DRAG_THRESHOLD)
+        gesture.dragging = true;
+      if (gesture.dragging) {
+        applyLookDelta(this, event.clientX-gesture.lastX, event.clientY-gesture.lastY, TOUCH_LOOK_SENSITIVITY);
+        event.preventDefault();
+      }
+      gesture.lastX=event.clientX; gesture.lastY=event.clientY;
     });
     this.listen(canvas, 'pointerup', event => {
-      this.canvasPointers.delete(event.pointerId);
-      const start = this.taps.get(event.pointerId);
-      this.taps.delete(event.pointerId);
-      if (start && !this.blocked() && event.timeStamp-start.time<=450 &&
-          Math.hypot(event.clientX-start.x,event.clientY-start.y)<=10) this.onCanvasClick(event);
+      const gesture = this.taps.get(event.pointerId);
+      this.endCameraPointer(event.pointerId);
+      if (gesture && gesture.tapEligible && !gesture.dragging && !this.blocked() &&
+          event.timeStamp-gesture.time<=450 && Math.hypot(event.clientX-gesture.x,event.clientY-gesture.y)<=TOUCH_DRAG_THRESHOLD)
+        this.onCanvasClick(event);
     });
-    for (const type of ['pointercancel','pointerleave']) this.listen(canvas, type, event => { this.taps.delete(event.pointerId); this.canvasPointers.delete(event.pointerId); });
+    for (const type of ['pointercancel','lostpointercapture'])
+      this.listen(canvas, type, event => this.endCameraPointer(event.pointerId));
+    this.listen(canvas, 'pointerleave', event => {
+      if (!canvas.hasPointerCapture(event.pointerId)) this.endCameraPointer(event.pointerId);
+    });
     this.listen(doc, 'orbitfolio:ui', () => this.release());
     this.listen(doc, 'visibilitychange', () => this.release());
     for (const type of ['blur','resize','orientationchange']) this.listen(host, type, () => this.release());
@@ -102,12 +122,16 @@ export class MobileFlightControls {
     element.classList.remove('is-pressed');
     if (element.hasPointerCapture(id)) element.releasePointerCapture(id);
   }
+  endCameraPointer(id) {
+    this.taps.delete(id);
+    this.canvasPointers.delete(id);
+    if (this.canvas.hasPointerCapture(id)) this.canvas.releasePointerCapture(id);
+  }
   release() {
     for (const id of [...this.pointers.keys()]) this.endPointer(id);
     this.axes.x=this.axes.z=0;
     this.keys.clear();
-    this.taps.clear();
-    this.canvasPointers.clear();
+    for (const id of [...this.canvasPointers]) this.endCameraPointer(id);
   }
   dispose() {
     this.disposed = true;

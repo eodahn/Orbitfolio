@@ -1,5 +1,5 @@
-export const MOUSE_SENSITIVITY = 0.0022;
-export const MAX_PITCH = Math.PI * 0.44;
+import { applyLookDelta, MOUSE_SENSITIVITY } from "./flight-look.js";
+export { MOUSE_SENSITIVITY, MAX_PITCH } from "./flight-look.js";
 export const PLANET_INTERACTION_DISTANCE = 65;
 const movementKeys = new Set([
   "KeyW",
@@ -58,12 +58,7 @@ export class FlightControls {
     this.listen(doc, "pointerlockerror", () => this.pointerLockError());
     this.listen(doc, "mousemove", (event) => {
       if (doc.pointerLockElement !== canvas || !this.navigation || this.blocked()) return;
-      this.yaw -= event.movementX * this.sensitivity;
-      this.yaw = Math.atan2(Math.sin(this.yaw), Math.cos(this.yaw));
-      this.pitch = Math.max(
-        -MAX_PITCH,
-        Math.min(MAX_PITCH, this.pitch - event.movementY * this.sensitivity),
-      );
+      applyLookDelta(this, event.movementX, event.movementY, this.sensitivity);
     });
     this.listen(host, "keydown", (event) => {
       if (event.key === "Escape" || event.key === "Esc" || event.code === "Escape") {

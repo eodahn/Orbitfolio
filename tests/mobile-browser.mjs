@@ -74,6 +74,10 @@ try {
       return {id,x:box.x+box.width/2,y:box.y+box.height/2};
     };
     const stick=await point('.touch-stick',1), boost=await point('[data-flight-key=ShiftLeft]',2), up=await point('[data-flight-key=Space]',3);
+    assert.ok(stick.x<viewport.width/2 && boost.x>viewport.width/2,'Joystick left, buttons right');
+    const hud=await page.locator('.warp-hud').boundingBox();
+    const stickBox=await page.locator('.touch-stick').boundingBox();
+    assert.ok(hud && hud.height<60 && hud.y+hud.height<stickBox.y,'Compact HUD above joystick');
     const initial=await page.evaluate(()=>({yaw:world.controls.yaw,pitch:world.controls.pitch,energy:world.warp.energy}));
     await send('touchStart',[stick]);
     await send('touchMove',[{...stick,x:stick.x+40}]);
@@ -96,7 +100,7 @@ try {
     await page.waitForFunction(()=>world.controls.axes.x===0 && world.controls.keys.size===0);
     await send('touchCancel',[]);
     await page.setViewportSize(viewport);
-    const empty = await page.evaluate(async()=>{
+    const findEmpty = () => page.evaluate(async()=>{
       const {pickPlanetSystem}=await import('/src/three/planet-interaction.js');
       const u=world, rect=u.canvas.getBoundingClientRect();
       for(const y of [.5,.65,.8])for(const x of [.25,.4,.6]) {
@@ -106,7 +110,24 @@ try {
       }
       throw new Error('No clear canvas point');
     });
-    await page.touchscreen.tap(empty.x,empty.y);
+    const empty=await findEmpty();
+    const beforeLook=await page.evaluate(()=>({yaw:world.controls.yaw,pitch:world.controls.pitch,
+      camera:world.camera.position.toArray(),interactions:window.canvasInteractions}));
+    const look={...empty,id:5}, movingStick={...stick,x:stick.x+40};
+    await send('touchStart',[stick,look]);
+    await send('touchMove',[movingStick,{...look,x:look.x+45,y:look.y+25}]);
+    await page.waitForFunction(before=>world.controls.axes.x>.2 &&
+      world.controls.yaw!==before.yaw && world.controls.pitch!==before.pitch,beforeLook);
+    await page.waitForFunction(()=>Math.abs(world.ship.rotation.y-world.controls.yaw)<1e-6 &&
+      Math.abs(world.ship.rotation.x-world.controls.pitch)<1e-6);
+    await page.waitForFunction(before=>world.camera.position.toArray().some((v,i)=>Math.abs(v-before.camera[i])>.1) &&
+      world.camera.position.distanceTo(world.ship.position)<25,beforeLook);
+    assert.equal(await page.evaluate(()=>world.controls.keys.size),0,'Camera drag does not press WASD');
+    await send('touchCancel',[]);
+    await page.waitForFunction(()=>world.controls.taps.size===0 && world.controls.axes.x===0);
+    assert.equal(await page.evaluate(()=>window.canvasInteractions),beforeLook.interactions,'Drag does not select');
+    const emptyAfterLook=await findEmpty();
+    await page.touchscreen.tap(emptyAfterLook.x,emptyAfterLook.y);
     assert.deepEqual(await page.evaluate(()=>({...world.controls.axes,keys:world.controls.keys.size})),{x:0,z:0,keys:0});
     assert.equal(await page.locator('[data-home-panel]').count(),0);
     // Put the existing planet on the center ray and tap through the real touch/raycast path.
@@ -118,6 +139,12 @@ try {
       u.renderer.render(u.scene,u.camera);
       const rect=u.canvas.getBoundingClientRect();return {x:rect.left+rect.width/2,y:rect.top+rect.height/2};
     },id);
+    const beforePlanetDrag=await page.evaluate(()=>window.canvasInteractions);
+    await send('touchStart',[{...tap,id:6}]);
+    await send('touchMove',[{...tap,id:6,x:tap.x+40,y:tap.y+20}]);
+    await send('touchEnd',[]);
+    assert.equal(await page.locator('[data-home-panel]').count(),0,'Dragging from a planet must not open it');
+    assert.equal(await page.evaluate(()=>window.canvasInteractions),beforePlanetDrag);
     await page.touchscreen.tap(tap.x,tap.y);
     await page.locator('[data-home-panel]').waitFor();
     assert.equal(await page.locator('.touch-controls').isVisible(),false);

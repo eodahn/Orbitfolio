@@ -216,7 +216,7 @@ export class Universe {
       const hint = this.canvas.parentElement.querySelector('[data-flight-hint] > p:last-child');
       if (hint) {
         this.desktopHint ??= hint.textContent;
-        hint.textContent = mobile ? 'Use o analógico para pilotar. Toque nos planetas para explorar; segure Dobra para acelerar.' : this.desktopHint;
+        hint.textContent = mobile ? 'Use o analógico para pilotar e arraste no espaço para olhar. Toque nos planetas; segure Dobra para acelerar.' : this.desktopHint;
       }
       this.resize();
     };
@@ -395,7 +395,7 @@ export class Universe {
   }
   updateFlight(delta, effects = true) {
     if (this.controls.blocked()) this.keys.clear();
-    if (this.controls.navigation)
+    if (this.controls.navigation || (this.mobileMode && !this.controls.blocked()))
       this.ship.rotation.set(this.controls.pitch, this.controls.yaw, 0, "YXZ");
     const active = this.warp.update(this.keys.has("ShiftLeft") || this.keys.has("ShiftRight"), delta);
     updateFlightVelocity(this.ship.userData.velocity, this.ship.quaternion, this.keys, active, delta, this.controls.axes);
