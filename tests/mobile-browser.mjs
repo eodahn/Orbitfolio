@@ -4,6 +4,12 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+// Intercept backend endpoints only: **/api/** also catches Vite's /src/api/index.js.
+const isApiRequest = url => url.pathname.startsWith('/api/');
+for (const [path, expected] of [
+  ['/api/auth/session', true], ['/api/projects?limit=10', true],
+  ['/src/api/index.js', false], ['/src/api/contracts.js', false],
+]) assert.equal(isApiRequest(new URL(path, 'http://127.0.0.1:5175')), expected, path);
 const temp=await mkdtemp(join(tmpdir(),'orbit-mobile-'));
 const server=spawn(process.execPath,['server.mjs'],{env:{...process.env,PORT:'3093',APP_ORIGIN:'http://127.0.0.1:5175',ORBITFOLIO_DATABASE_PATH:join(temp,'db.sqlite')},stdio:'ignore'});
 const vite=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','5175','--strictPort'],{stdio:'ignore'});
@@ -17,7 +23,7 @@ try {
   browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE||undefined,args:['--no-sandbox','--enable-unsafe-swiftshader','--use-angle=swiftshader']});
   for(const viewport of [{width:390,height:844},{width:430,height:932},{width:844,height:390}]) {
     const context=await browser.newContext({viewport,hasTouch:true,isMobile:true});
-    await context.route('**/api/**', async route=>{
+    await context.route(isApiRequest, async route=>{
       const request=route.request(), url=new URL(request.url());
       const response=await route.fetch({url:'http://127.0.0.1:3093'+url.pathname+url.search});
       await route.fulfill({response});
@@ -32,8 +38,17 @@ try {
       if(request)Element.prototype.requestPointerLock=function(...args){window.lockCalls++;return request.apply(this,args);};
     });
     await page.goto('http://127.0.0.1:5175/account');
+    // /account renders the normal shell for an anonymous visitor too.
+    // Wait for actual app initialization before creating fixtures or hooking Universe.
+    await page.getByRole('heading', {name:'Conta', exact:true}).waitFor();
+    const homeLink = page.getByRole('navigation', {name:'Navegação principal'})
+      .getByRole('link', {name:'Início', exact:true});
+    await homeLink.waitFor({state:'visible'});
+    assert.equal(await homeLink.getAttribute('href'), '/');
+    assert.equal(await page.evaluate(()=>document.documentElement.classList.contains('touch-mode')), true);
     const id=await page.evaluate(async()=>{
-      await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Mobile Tester',username:'mobile'+Date.now(),email:`mobile${Date.now()}@test.local`,password:'mobile-test-password'})});
+      const registration=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Mobile Tester',username:'mobile'+Date.now(),email:`mobile${Date.now()}@test.local`,password:'mobile-test-password'})});
+      if(!registration.ok)throw new Error(await registration.text());
       const response=await fetch('/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Touch Planet',demoUrl:'https://example.com',languages:{HTML:60,Python:30,Shell:10}})});
       if(!response.ok)throw new Error(await response.text());
       const {project}=await response.json();
@@ -42,7 +57,8 @@ try {
       Universe.prototype.start=function(){window.world=this;return start.call(this);};
       return project.id;
     });
-    await page.getByRole('link',{name:'Início',exact:true}).click();
+    await homeLink.tap();
+    await page.waitForURL('http://127.0.0.1:5175/');
     await page.waitForFunction(()=>window.world?.running && window.world.planets.length>0);
     await page.locator('.touch-controls').waitFor({state:'visible'});
     await page.evaluate(()=>{
