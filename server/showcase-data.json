@@ -1,0 +1,90 @@
+[
+  {
+    "id": "demo-amit-das",
+    "username": "demo-amit-das",
+    "name": "Amit Das",
+    "projectId": "demo-amit-das-portfolio",
+    "projectName": "Portfolio",
+    "description": "Portfólio interativo com React, animações GSAP e elementos Three.js/WebGL.",
+    "externalUrl": "https://amitdas-dev.web.app",
+    "repositoryUrl": "https://github.com/AmitDas4321/Portfolio",
+    "languageBytes": {
+      "TypeScript": 65226,
+      "CSS": 39095,
+      "HTML": 2023,
+      "JavaScript": 1592
+    },
+    "languages": {
+      "TypeScript": 60.43025496590572,
+      "CSS": 36.22053809664987,
+      "HTML": 1.874258820041506,
+      "JavaScript": 1.4749481174029055
+    },
+    "sizeBytes": 37748736,
+    "verifiedAt": "2026-10-05T02:03:49.290405+00:00",
+    "sources": [
+      "https://api.github.com/repos/AmitDas4321/Portfolio",
+      "https://api.github.com/repos/AmitDas4321/Portfolio/languages",
+      "https://github.com/AmitDas4321",
+      "https://amitdas-dev.web.app"
+    ]
+  },
+  {
+    "id": "demo-henry-heffernan",
+    "username": "demo-henry-heffernan",
+    "name": "Henry Heffernan",
+    "projectId": "demo-henry-heffernan-portfolio",
+    "projectName": "Portfolio Website",
+    "description": "Portfólio 3D de Henry Heffernan com uma experiência de computador virtual.",
+    "externalUrl": "https://henryheffernan.com",
+    "repositoryUrl": "https://github.com/henryjeff/portfolio-website",
+    "languageBytes": {
+      "TypeScript": 106491,
+      "CSS": 4649,
+      "JavaScript": 4384,
+      "GLSL": 4249,
+      "HTML": 4089
+    },
+    "languages": {
+      "TypeScript": 85.97552114449952,
+      "CSS": 3.7533706867320085,
+      "JavaScript": 3.539422906137476,
+      "GLSL": 3.4304306405515814,
+      "HTML": 3.301254622079411
+    },
+    "sizeBytes": 242578432,
+    "verifiedAt": "2026-10-05T02:03:47.843887+00:00",
+    "sources": [
+      "https://api.github.com/repos/henryjeff/portfolio-website",
+      "https://api.github.com/repos/henryjeff/portfolio-website/languages",
+      "https://github.com/henryjeff",
+      "https://henryheffernan.com"
+    ]
+  },
+  {
+    "id": "demo-brittany-chiang",
+    "username": "demo-brittany-chiang",
+    "name": "Brittany Chiang",
+    "projectId": "demo-brittany-chiang-portfolio",
+    "projectName": "Portfolio v4",
+    "description": "Quarta versão do portfólio pessoal de Brittany Chiang, construída com Gatsby.",
+    "externalUrl": "https://v4.brittanychiang.com/",
+    "repositoryUrl": "https://github.com/bchiang7/v4",
+    "languageBytes": {
+      "JavaScript": 135515,
+      "Shell": 62
+    },
+    "languages": {
+      "JavaScript": 99.95426952949246,
+      "Shell": 0.04573047050753446
+    },
+    "sizeBytes": 54201344,
+    "verifiedAt": "2026-10-05T02:03:48.199769+00:00",
+    "sources": [
+      "https://api.github.com/repos/bchiang7/v4",
+      "https://api.github.com/repos/bchiang7/v4/languages",
+      "https://github.com/bchiang7",
+      "https://v4.brittanychiang.com/"
+    ]
+  }
+]

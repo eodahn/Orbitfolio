@@ -1,0 +1,24 @@
+.fatal-state {
+  display: grid;
+  align-content: center;
+  gap: 14px;
+  min-height: 100vh;
+  max-width: 650px;
+  margin: auto;
+  padding: 32px;
+  color: var(--text);
+}
+.fatal-state h1 {
+  margin: 0;
+  font-size: clamp(34px, 5vw, 62px);
+  letter-spacing: -1.5px;
+}
+.fatal-state p:not(.eyebrow) {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.fatal-state .button {
+  width: max-content;
+  margin-top: 6px;
+}

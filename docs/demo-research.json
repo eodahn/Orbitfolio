@@ -1,0 +1,84 @@
+[
+  {
+    "repo": "AmitDas4321/Portfolio",
+    "name": "Amit Das",
+    "site": "https://amitdas-dev.web.app",
+    "status": 200,
+    "final": "https://amitdas-dev.web.app",
+    "title": "Amit Das - Full Stack Developer",
+    "languages": {
+      "TypeScript": 65226,
+      "CSS": 39095,
+      "HTML": 2023,
+      "JavaScript": 1592
+    },
+    "sizeBytes": 37748736,
+    "branch": "main",
+    "verifiedAt": "2026-10-05T02:03:49.290405+00:00"
+  },
+  {
+    "repo": "henryjeff/portfolio-website",
+    "name": "Henry Heffernan",
+    "site": "https://henryheffernan.com",
+    "status": 200,
+    "final": "https://henryheffernan.com",
+    "title": "Henry Heffernan - Portfolio 2022",
+    "languages": {
+      "TypeScript": 106491,
+      "CSS": 4649,
+      "JavaScript": 4384,
+      "GLSL": 4249,
+      "HTML": 4089
+    },
+    "sizeBytes": 242578432,
+    "branch": "master",
+    "verifiedAt": "2026-10-05T02:03:47.843887+00:00"
+  },
+  {
+    "repo": "bchiang7/v4",
+    "name": "Brittany Chiang",
+    "site": "https://v4.brittanychiang.com/",
+    "status": 200,
+    "final": "https://v4.brittanychiang.com/",
+    "title": "Brittany Chiang",
+    "languages": {
+      "JavaScript": 135515,
+      "Shell": 62
+    },
+    "sizeBytes": 54201344,
+    "branch": "main",
+    "verifiedAt": "2026-10-05T02:03:48.199769+00:00"
+  },
+  {
+    "repo": "andrewwoan/abigail-bloom-portolio-bokoko33",
+    "name": "Andrew Woan",
+    "site": "https://abigail-bloom-portolio-bokoko33.vercel.app/",
+    "status": 200,
+    "final": "https://abigail-bloom-portolio-bokoko33.vercel.app/",
+    "title": "Abigail Bloom",
+    "languages": {
+      "JavaScript": 52595,
+      "HTML": 10111,
+      "CSS": 7665
+    },
+    "sizeBytes": 2811904,
+    "branch": "master",
+    "verifiedAt": "2026-10-05T02:03:48.423510+00:00"
+  },
+  {
+    "repo": "ryanbalieiro/react-portfolio-template",
+    "name": "Ryan Balieiro",
+    "site": "https://ryanbalieiro.github.io/react-portfolio-template/",
+    "status": 200,
+    "final": "https://ryanbalieiro.github.io/react-portfolio-template/",
+    "title": "React Portfolio by Ryan Balieiro",
+    "languages": {
+      "JavaScript": 343977,
+      "SCSS": 117664,
+      "HTML": 3269
+    },
+    "sizeBytes": 9831424,
+    "branch": "main",
+    "verifiedAt": "2026-10-05T02:03:48.475443+00:00"
+  }
+]
