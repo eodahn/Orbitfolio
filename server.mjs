@@ -55,6 +55,7 @@ const types = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
+  ".ico": "image/x-icon",
   ".glb": "model/gltf-binary",
 };
 const reply = (res, status, payload, headers = {}) => {
