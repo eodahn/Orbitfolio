@@ -83,6 +83,14 @@ a {
   text-decoration: none;
   background: linear-gradient(135deg, var(--violet), var(--pink));
 }
+.account-orb-logo {
+  display: block;
+  width: 80%;
+  height: 80%;
+  max-width: 32px;
+  max-height: 32px;
+  object-fit: contain;
+}
 .universe-page {
   height: 100vh;
   overflow: hidden;
