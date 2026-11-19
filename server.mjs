@@ -32,22 +32,36 @@ import {
   updateProfile,
 } from "./server/social.js";
 const root = fileURLToPath(new URL(".", import.meta.url));
+const demo = process.argv.includes("--school-demo");
 let db;
 try {
-  const config = databaseConfig();
-  console.log(`Banco selecionado: ${config.dialect}. Aplicando migrations pendentes.`);
-  db = await openConfiguredDatabase();
-  console.log(`Migrações ${db.dialect} concluídas.`);
-  if (process.env.SEED_SHOWCASE === "true") await seedShowcase(db);
-  if (process.env.SEED_DEMO === "true" && process.env.NODE_ENV !== "production" && process.env.RENDER !== "true")
-    await seedDevelopmentData(db);
+  if (demo) {
+    if (process.env.RENDER === "true" || process.env.NODE_ENV === "production") throw Error("Demonstração exclusivamente local.");
+    const { openDemo } = await import("./server/local-demo.js");
+    db = await openDemo(process.argv.includes("--reset"));
+    if (process.argv.includes("--reset")) {
+      await db.close();
+      console.log("Dados da demonstração recriados.");
+      process.exit(0);
+    }
+  } else {
+    const config = databaseConfig();
+    console.log(`Banco selecionado: ${config.dialect}. Aplicando migrations pendentes.`);
+    db = await openConfiguredDatabase();
+    console.log(`Migrações ${db.dialect} concluídas.`);
+    if (process.env.SEED_SHOWCASE === "true") await seedShowcase(db);
+    if (process.env.SEED_DEMO === "true" && process.env.NODE_ENV !== "production" && process.env.RENDER !== "true")
+      await seedDevelopmentData(db);
+  }
   await ensureOrbits(db);
 } catch (error) {
   console.error(databaseStartupError(error));
   await db?.close();
   process.exit(1);
 }
-const github = createGithubService(db);
+const github = demo
+  ? (await import("./server/local-demo.js")).demoRepositories(db)
+  : createGithubService(db);
 const types = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -224,6 +238,7 @@ const server = http.createServer(async (req, res) => {
       return reply(res, 200, {
         ok: true,
         backend: `node-${db.dialect}`,
+        ...(demo ? { schoolDemo: true } : {}),
       });
     if (path === "/api/auth/session" && req.method === "GET")
       return reply(res, 200, {
@@ -517,9 +532,9 @@ const server = http.createServer(async (req, res) => {
     });
   }
 });
-server.listen(Number(process.env.PORT ?? 3000), "0.0.0.0", () =>
+server.listen(demo ? 5173 : Number(process.env.PORT ?? 3000), demo ? "127.0.0.1" : "0.0.0.0", () =>
   console.log(
-    `Orbitfolio disponível em 0.0.0.0:${server.address().port}`,
+    `Orbitfolio disponível em http://${demo ? "127.0.0.1" : "0.0.0.0"}:${server.address().port}`,
   ),
 );
 

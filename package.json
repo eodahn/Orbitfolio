@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "npm run demo",
     "build": "vite build",
     "preview": "vite preview",
     "server": "node server.mjs",
@@ -28,7 +28,11 @@
     "test:startup": "node tests/startup-postgres.mjs",
     "seed:demo": "node scripts/seed-showcase.mjs",
     "test:features": "node tests/features-browser.mjs",
-    "test:mobile": "node tests/mobile-browser.mjs"
+    "test:mobile": "node tests/mobile-browser.mjs",
+    "demo": "npm run build && node server.mjs --school-demo",
+    "demo:reset": "node server.mjs --school-demo --reset",
+    "demo:prints": "node tests/demo-browser.mjs",
+    "dev:vite": "vite"
   },
   "dependencies": {
     "busboy": "^1.6.0",

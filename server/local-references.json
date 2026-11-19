@@ -1,0 +1,82 @@
+[
+  {
+    "id": "folio-2019",
+    "name": "Bruno Simon — Portfolio",
+    "site": "https://bruno-simon.com/",
+    "repo": "https://github.com/brunosimon/folio-2019",
+    "description": "Portfólio interativo em 3D no qual o visitante explora um ambiente virtual utilizando um veículo.",
+    "language": "JavaScript"
+  },
+  {
+    "id": "three-js",
+    "name": "Three.js",
+    "site": "https://threejs.org/",
+    "repo": "https://github.com/mrdoob/three.js",
+    "description": "Biblioteca JavaScript para criação de experiências 3D diretamente no navegador utilizando WebGL.",
+    "language": "JavaScript"
+  },
+  {
+    "id": "react-three-fiber",
+    "name": "React Three Fiber",
+    "site": "https://r3f.docs.pmnd.rs/",
+    "repo": "https://github.com/pmndrs/react-three-fiber",
+    "description": "Biblioteca que integra Three.js ao React, permitindo construir experiências 3D utilizando componentes.",
+    "language": "TypeScript"
+  },
+  {
+    "id": "drei",
+    "name": "Drei",
+    "site": "https://drei.docs.pmnd.rs/",
+    "repo": "https://github.com/pmndrs/drei",
+    "description": "Conjunto de ferramentas e componentes para React Three Fiber.",
+    "language": "TypeScript"
+  },
+  {
+    "id": "vanta",
+    "name": "Vanta.js",
+    "site": "https://www.vantajs.com/",
+    "repo": "https://github.com/tengbao/vanta",
+    "description": "Biblioteca de fundos animados e interativos utilizando WebGL.",
+    "language": "JavaScript"
+  },
+  {
+    "id": "particles",
+    "name": "Particles.js",
+    "site": "https://vincentgarreau.com/particles.js/",
+    "repo": "https://github.com/VincentGarreau/particles.js",
+    "description": "Biblioteca para criação de sistemas de partículas animadas em páginas web.",
+    "language": "JavaScript"
+  },
+  {
+    "id": "fluid-simulation",
+    "name": "WebGL Fluid Simulation",
+    "site": "https://paveldogreat.github.io/WebGL-Fluid-Simulation/",
+    "repo": "https://github.com/PavelDoGreat/WebGL-Fluid-Simulation",
+    "description": "Experiência interativa que simula fluidos em tempo real utilizando WebGL.",
+    "language": "JavaScript"
+  },
+  {
+    "id": "a-frame",
+    "name": "A-Frame",
+    "site": "https://aframe.io/",
+    "repo": "https://github.com/aframevr/aframe",
+    "description": "Framework para criação de experiências 3D e realidade virtual diretamente no navegador.",
+    "language": "JavaScript"
+  },
+  {
+    "id": "theatre",
+    "name": "Theatre.js",
+    "site": "https://www.theatrejs.com/",
+    "repo": "https://github.com/theatre-js/theatre",
+    "description": "Ferramenta para criação e controle de animações e sequências visuais.",
+    "language": "TypeScript"
+  },
+  {
+    "id": "lenis",
+    "name": "Lenis",
+    "site": "https://lenis.darkroom.engineering/",
+    "repo": "https://github.com/darkroomengineering/lenis",
+    "description": "Biblioteca de rolagem suave para experiências web.",
+    "language": "TypeScript"
+  }
+]
